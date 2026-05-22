@@ -1,6 +1,6 @@
 # CRM Management System (JavaFX)
 
-Questo è un gestionale CRM sviluppato in Java utilizzando JavaFX, progettato per avere un'interfaccia moderna e pulita simile a quella richiesta.
+Questo è un gestionale CRM sviluppato in Java utilizzando JavaFX, progettato per avere un'interfaccia moderna e pulita.
 
 ## Caratteristiche
 - **Sidebar di Navigazione**: Accesso rapido a Dashboard, Contatti, Calendario, Lead, ecc.
@@ -9,7 +9,7 @@ Questo è un gestionale CRM sviluppato in Java utilizzando JavaFX, progettato pe
 - **Stile Moderno**: Design basato su CSS con font chiari e colori professionali.
 
 ## Requisiti
-- Java JDK 17 o superiore
+- Java JDK 17 o superiore(io uso il 25)
 - Maven
 
 ## Come Eseguire
@@ -22,7 +22,7 @@ Questo è un gestionale CRM sviluppato in Java utilizzando JavaFX, progettato pe
    ```bash
    ./run.sh
    ```
-
+   Io eseguo da IntelliJ.
 ## Struttura del Progetto
 - `src/main/java`: Contiene il codice sorgente Java (App, Controller, Model).
 - `src/main/resources`: Contiene i file FXML per il layout e il file CSS per lo stile.
