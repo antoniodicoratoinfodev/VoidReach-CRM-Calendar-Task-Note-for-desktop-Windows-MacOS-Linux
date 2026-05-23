@@ -21,7 +21,7 @@ A desktop CRM (Customer Relationship Management) application built with Java and
 - Live pagination info label showing the current range and total contacts (e.g. *Showing 1–15 of 103 Contacts*).
 
 ### Calendar View
-- **Day-view timeline** with a full 24-hour grid, divided into hours and 15-minute intervals.
+- **Day-view timeline** with a full 24-hour grid.
 - **Create tasks** by clicking on any time slot on the timeline.
 - **Drag & drop tasks** to reschedule them by moving them along the timeline.
 - **Resize tasks** by dragging the bottom handle of any task block.
