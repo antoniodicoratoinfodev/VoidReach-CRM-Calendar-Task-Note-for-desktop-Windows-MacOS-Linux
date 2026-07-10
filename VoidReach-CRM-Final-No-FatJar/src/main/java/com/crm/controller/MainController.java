@@ -9,6 +9,7 @@ import com.crm.repository.CrmDataRepository;
 import com.crm.repository.LocalCrmDataRepository;
 import com.crm.service.AvatarService;
 import com.crm.service.AuthService;
+import javafx.animation.PauseTransition;
 import javafx.geometry.Side;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -30,9 +31,9 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
-import javafx.scene.shape.Line;
 import javafx.stage.Stage;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -103,6 +104,8 @@ public class MainController {
     private double dragAnchorY;
     private double dragInitialTop;
     private double currentZoom = DEFAULT_ZOOM;
+    private PauseTransition calendarResizeDebounce;
+    private boolean calendarOpening;
     
     private boolean isDarkMode = true;
     private String currentViewMode = "Day"; 
@@ -322,10 +325,26 @@ public class MainController {
     private void setupCalendarZoomControls() {
         calendarScrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         calendarScrollPane.setFitToWidth(true);
+        calendarResizeDebounce = new PauseTransition(Duration.millis(120));
+        calendarResizeDebounce.setOnFinished(event -> {
+            setupMainCalendar();
+            calendarScrollPane.setHvalue(0);
+        });
         calendarScrollPane.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> {
             if (Math.abs(oldBounds.getWidth() - newBounds.getWidth()) > 1) {
-                setupMainCalendar();
-                calendarScrollPane.setHvalue(0);
+                if (!calendarView.isVisible()) return;
+
+                // The first viewport size after showing the hidden calendar is final enough
+                // to render immediately. Subsequent changes are regular window resizes and
+                // remain debounced to avoid repeated calendar rebuilds.
+                if (calendarOpening) {
+                    calendarOpening = false;
+                    calendarResizeDebounce.stop();
+                    setupMainCalendar();
+                    calendarScrollPane.setHvalue(0);
+                } else {
+                    calendarResizeDebounce.playFromStart();
+                }
             }
         });
 
@@ -352,8 +371,13 @@ public class MainController {
         
         calendarView.visibleProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal) {
+                calendarOpening = true;
+                calendarResizeDebounce.stop();
                 calendarTimelineArea.requestFocus();
                 calendarScrollPane.setHvalue(0);
+            } else {
+                calendarOpening = false;
+                calendarResizeDebounce.stop();
             }
         });
     }
@@ -587,14 +611,20 @@ public class MainController {
         double zoomedHourHeight = HOUR_HEIGHT * currentZoom;
         double zoomedMinuteHeight = MINUTE_HEIGHT * currentZoom;
         double timelineWidth = getTimelineWidth();
+        double timelineHeight = 24 * zoomedHourHeight + 20;
         
-        timeLabelsContainer.setPrefHeight(24 * zoomedHourHeight + 20);
-        calendarTimelineArea.setPrefHeight(24 * zoomedHourHeight + 20);
+        timeLabelsContainer.setPrefHeight(timelineHeight);
+        calendarTimelineArea.setPrefHeight(timelineHeight);
         calendarTimelineArea.setMinWidth(timelineWidth);
         calendarTimelineArea.setPrefWidth(timelineWidth);
         calendarTimelineArea.setMaxWidth(timelineWidth);
 
-        // Common Time Grid
+        Canvas gridCanvas = new Canvas(timelineWidth, timelineHeight);
+        gridCanvas.setMouseTransparent(true);
+        drawTimelineGrid(gridCanvas, timelineWidth, zoomedHourHeight, zoomedMinuteHeight);
+        calendarTimelineArea.getChildren().add(gridCanvas);
+
+        // Time labels remain nodes so they preserve their existing CSS typography.
         for (int i = 0; i <= 24; i++) {
             double hourY = i * zoomedHourHeight;
             Label hourLabel = new Label(String.format("%02d:00", i));
@@ -602,10 +632,6 @@ public class MainController {
             AnchorPane.setRightAnchor(hourLabel, 10.0);
             AnchorPane.setTopAnchor(hourLabel, hourY - 10);
             timeLabelsContainer.getChildren().add(hourLabel);
-
-            Line line = new Line(0, hourY, timelineWidth, hourY);
-            line.getStyleClass().add("timeline-line-hour");
-            calendarTimelineArea.getChildren().add(line);
 
             if (i < 24) {
                 int subdivisions = currentZoom > 1.5 ? 60 : 4;
@@ -619,10 +645,6 @@ public class MainController {
                         AnchorPane.setTopAnchor(subLabel, sy - 7);
                         timeLabelsContainer.getChildren().add(subLabel);
                     }
-                    Line sLine = new Line(0, sy, timelineWidth, sy);
-                    sLine.getStyleClass().add("timeline-line");
-                    if (currentZoom > 1.5 && s % 5 != 0) sLine.setOpacity(0.3);
-                    calendarTimelineArea.getChildren().add(sLine);
                 }
             }
         }
@@ -632,6 +654,43 @@ public class MainController {
         } else {
             renderWeekView(timelineWidth, zoomedHourHeight, zoomedMinuteHeight);
         }
+    }
+
+    private void drawTimelineGrid(Canvas canvas, double timelineWidth, double zoomedHourHeight, double zoomedMinuteHeight) {
+        GraphicsContext graphics = canvas.getGraphicsContext2D();
+        Color hourColor = Color.web(isDarkMode ? "#4a5568" : "#cbd5e1");
+        Color intervalColor = Color.web(isDarkMode ? "#2d3748" : "#f1f5f9");
+        Color weekDividerColor = Color.web(isDarkMode ? "#334155" : "#e2e8f0");
+        graphics.setLineWidth(1);
+
+        for (int hour = 0; hour <= 24; hour++) {
+            double hourY = hour * zoomedHourHeight;
+            graphics.setGlobalAlpha(1);
+            graphics.setStroke(hourColor);
+            graphics.strokeLine(0, hourY, timelineWidth, hourY);
+
+            if (hour < 24) {
+                int subdivisions = currentZoom > 1.5 ? 60 : 4;
+                int interval = 60 / subdivisions;
+                graphics.setStroke(intervalColor);
+                for (int subdivision = 1; subdivision < subdivisions; subdivision++) {
+                    double y = hourY + (subdivision * interval * zoomedMinuteHeight);
+                    graphics.setGlobalAlpha(currentZoom > 1.5 && subdivision % 5 != 0 ? 0.3 : 1);
+                    graphics.strokeLine(0, y, timelineWidth, y);
+                }
+            }
+        }
+
+        if (currentViewMode.equals("Week")) {
+            double dayWidth = timelineWidth / 7.0;
+            graphics.setGlobalAlpha(1);
+            graphics.setStroke(weekDividerColor);
+            for (int day = 1; day < 7; day++) {
+                double x = day * dayWidth;
+                graphics.strokeLine(x, 0, x, 24 * zoomedHourHeight);
+            }
+        }
+        graphics.setGlobalAlpha(1);
     }
 
     private void renderDayView(double zoomedMinuteHeight) {
@@ -654,12 +713,6 @@ public class MainController {
             dayHeader.setLayoutX(d * dayWidth);
             dayHeader.setLayoutY(0);
             calendarTimelineArea.getChildren().add(dayHeader);
-
-            if (d > 0) {
-                Line vLine = new Line(d * dayWidth, 0, d * dayWidth, 24 * zoomedHourHeight);
-                vLine.getStyleClass().add("week-day-column");
-                calendarTimelineArea.getChildren().add(vLine);
-            }
 
             final int dayOffset = d;
             List<Task> tasks = taskDatabase.getOrDefault(date, new ArrayList<>());
@@ -1035,7 +1088,7 @@ public class MainController {
         }
     }
 
-    @FXML private void handleThemeToggle() { isDarkMode = !isDarkMode; applyTheme(); updateThemeButton(); updateRightSidebar(); }
+    @FXML private void handleThemeToggle() { isDarkMode = !isDarkMode; applyTheme(); updateThemeButton(); setupMainCalendar(); updateRightSidebar(); }
 
     private void applyTheme() {
         try {
