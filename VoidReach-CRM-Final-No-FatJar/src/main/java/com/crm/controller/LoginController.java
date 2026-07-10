@@ -4,6 +4,7 @@ import com.crm.model.UserAccount;
 import com.crm.repository.LocalUserRepository;
 import com.crm.service.AuthService;
 import java.util.function.BiConsumer;
+import javafx.application.Platform;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.layout.VBox;
@@ -18,10 +19,19 @@ public class LoginController {
     private BiConsumer<UserAccount, Boolean> authenticated;
 
     public void setOnAuthenticated(BiConsumer<UserAccount, Boolean> authenticated) { this.authenticated = authenticated; }
+    public void requestInitialFocus() { Platform.runLater(loginEmail::requestFocus); }
     @FXML private void showLogin() { show(loginPane); }
     @FXML private void showRegister() { show(registerPane); }
     @FXML private void showRecovery() { show(recoveryPane); }
-    private void show(VBox pane) { loginPane.setVisible(false); registerPane.setVisible(false); recoveryPane.setVisible(false); resetPane.setVisible(false); loginPane.setManaged(false); registerPane.setManaged(false); recoveryPane.setManaged(false); resetPane.setManaged(false); pane.setVisible(true); pane.setManaged(true); clearMessages(); }
+    private void show(VBox pane) {
+        loginPane.setVisible(false); registerPane.setVisible(false); recoveryPane.setVisible(false); resetPane.setVisible(false);
+        loginPane.setManaged(false); registerPane.setManaged(false); recoveryPane.setManaged(false); resetPane.setManaged(false);
+        pane.setVisible(true); pane.setManaged(true); clearMessages();
+        if (pane == loginPane) Platform.runLater(loginEmail::requestFocus);
+        else if (pane == registerPane) Platform.runLater(registerName::requestFocus);
+        else if (pane == recoveryPane) Platform.runLater(recoveryEmail::requestFocus);
+        else Platform.runLater(resetCode::requestFocus);
+    }
     private void clearMessages() { loginMessage.setText(""); registerMessage.setText(""); recoveryMessage.setText(""); resetMessage.setText(""); }
 
     @FXML private void handleLogin() { try { authenticated.accept(auth.login(loginEmail.getText(), loginPassword.getText()), rememberLogin.isSelected()); } catch (IllegalArgumentException e) { loginMessage.setText(e.getMessage()); } }

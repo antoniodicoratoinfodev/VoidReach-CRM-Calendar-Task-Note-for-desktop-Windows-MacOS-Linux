@@ -1,9 +1,5 @@
 package com.crm.app;
 
-import java.awt.Taskbar;
-import java.awt.Toolkit;
-import java.util.concurrent.CompletableFuture;
-
 import com.crm.controller.SplashScreenController;
 import com.crm.controller.LoginController;
 import com.crm.controller.MainController;
@@ -11,10 +7,6 @@ import com.crm.model.UserAccount;
 import com.crm.repository.LocalUserRepository;
 import com.crm.service.SessionService;
 
-import javafx.animation.Interpolator;
-import javafx.animation.KeyFrame;
-import javafx.animation.KeyValue;
-import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
@@ -25,15 +17,16 @@ import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
-import javafx.util.Duration;
 
 public class Main extends Application {
 
     private Stage mainStage;
     private Stage splashStage;
     private SplashScreenController splashController;
-    private Parent mainRoot;
+    private Parent loginRoot;
     private LoginController loginController;
+    private MainController rememberedAppController;
+    private UserAccount rememberedUser;
     private final SessionService sessionService = new SessionService(new LocalUserRepository());
 
     @Override
@@ -49,6 +42,7 @@ public class Main extends Application {
 
         splashStage = new Stage();
         splashStage.initStyle(StageStyle.TRANSPARENT);
+        splashStage.setAlwaysOnTop(true);
         Scene scene = new Scene(root);
         scene.setFill(Color.TRANSPARENT);
         scene.getStylesheets().add(getClass().getResource("/css/style-dark.css").toExternalForm());
@@ -57,25 +51,26 @@ public class Main extends Application {
         splashStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
         splashStage.centerOnScreen();
         splashStage.show();
+        splashStage.toFront();
+        splashStage.requestFocus();
 
         startLoadingTask();
     }
 
     private void startLoadingTask() {
-        Task<Parent> loadTask = new Task<>() {
+        Task<UserAccount> loadTask = new Task<>() {
             @Override
-            protected Parent call() throws Exception {
+            protected UserAccount call() throws Exception {
                 // 1. Core Initialization
                 updateMessage("Core Initialization...");
                 updateProgress(0.1, 1.0);
                 Thread.sleep(400); 
 
-                // 2. Authentication UI loading
-                updateMessage("Loading access screen...");
+                // 2. Authentication and session loading
+                updateMessage("Checking saved session...");
                 updateProgress(0.3, 1.0);
-                FXMLLoader loginLoader = new FXMLLoader(getClass().getResource("/com/crm/view/LoginView.fxml"));
-                Parent root = loginLoader.load();
-                loginController = loginLoader.getController();
+                UserAccount savedUser = sessionService.getRememberedUser().orElse(null);
+                if (savedUser != null) updateMessage("Loading your workspace...");
                 updateProgress(0.6, 1.0);
                 Thread.sleep(300);
 
@@ -89,7 +84,7 @@ public class Main extends Application {
                 updateProgress(1.0, 1.0);
                 Thread.sleep(300);
 
-                return root;
+                return savedUser;
             }
         };
 
@@ -97,21 +92,43 @@ public class Main extends Application {
         loadTask.progressProperty().addListener((obs, old, prog) -> splashController.setProgress(prog.doubleValue()));
 
         loadTask.setOnSucceeded(e -> {
-            this.mainRoot = loadTask.getValue();
-            transitionToLogin();
+            try {
+                rememberedUser = loadTask.getValue();
+                loadLoginView();
+                if (rememberedUser != null) loadAndShowRememberedApp();
+                else transitionToLogin();
+            } catch (Exception ex) {
+                throw new IllegalStateException("Impossibile caricare l'interfaccia", ex);
+            }
         });
 
-        new Thread(loadTask).start();
+        Thread loaderThread = new Thread(loadTask, "voidreach-startup-loader");
+        loaderThread.setDaemon(true);
+        loaderThread.start();
+    }
+
+    private void loadLoginView() throws Exception {
+        FXMLLoader loginLoader = new FXMLLoader(getClass().getResource("/com/crm/view/LoginView.fxml"));
+        loginRoot = loginLoader.load();
+        loginController = loginLoader.getController();
+        configureLoginHandler();
+    }
+
+    private void loadAndShowRememberedApp() throws Exception {
+        FXMLLoader appLoader = new FXMLLoader(getClass().getResource("/com/crm/view/MainView.fxml"));
+        Parent root = appLoader.load();
+        rememberedAppController = appLoader.getController();
+        transitionToRememberedApp(root);
     }
 
     private void transitionToLogin() {
-        if (mainRoot == null) return;
+        if (loginRoot == null) return;
 
         // 1. Main Stage Setup
         mainStage.setTitle("VoidReach CRM — Accesso");
         mainStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
         
-        Scene scene = new Scene(mainRoot);
+        Scene scene = new Scene(loginRoot);
         scene.setFill(Color.web("#0f172a"));
         scene.getStylesheets().add(getClass().getResource("/css/style-dark.css").toExternalForm());
         
@@ -120,44 +137,27 @@ public class Main extends Application {
         mainStage.setWidth(580);
         mainStage.setHeight(700);
         mainStage.centerOnScreen();
-        mainStage.setOpacity(0.0); // Fully invisible at start
-        mainStage.show();
+        showMainStage(loginController::requestInitialFocus);
+    }
 
-        // 2. Content Preparation
-        mainRoot.setOpacity(1.0); // Content is already opaque, fade the whole Stage
-        
-        // 3. Timeline for smooth transition (Cross-Fade Stage)
-        Timeline transitionTimeline = new Timeline();
-        
-        // Splash animation fades out faster (600ms)
-        KeyValue splashValue = new KeyValue(splashStage.opacityProperty(), 0.0, Interpolator.EASE_BOTH);
-        KeyFrame splashFrame = new KeyFrame(Duration.millis(600), splashValue);
-        
-        // Main animation fades in smoothly (800ms)
-        KeyValue mainValue = new KeyValue(mainStage.opacityProperty(), 1.0, Interpolator.EASE_OUT);
-        KeyFrame mainFrame = new KeyFrame(Duration.millis(800), mainValue);
-        
-        transitionTimeline.getKeyFrames().addAll(splashFrame, mainFrame);
-        transitionTimeline.setOnFinished(e -> {
-            splashStage.close();
-            setupOSIcons();
-            loginController.setOnAuthenticated((user, remember) -> {
-                if (remember) sessionService.remember(user);
-                else sessionService.forget();
-                showMainApplication(user);
-            });
-            sessionService.getRememberedUser().ifPresent(this::showMainApplication);
-        });
+    private void transitionToRememberedApp(Parent root) {
+        if (root == null || rememberedAppController == null) return;
+        mainStage.setTitle("VoidReach CRM");
+        mainStage.getIcons().add(new Image(getClass().getResourceAsStream("/images/app-icon.png")));
+        rememberedAppController.setCurrentUser(rememberedUser, this::logout);
+        Scene scene = new Scene(root);
+        scene.setFill(Color.web("#0f172a"));
+        scene.getStylesheets().add(getClass().getResource("/css/style-dark.css").toExternalForm());
+        mainStage.setScene(scene);
+        mainStage.setMaximized(true);
+        showMainStage(rememberedAppController::requestInitialFocus);
+    }
 
-        // 4. Synchronized Execution (Optimized for macOS/Windows/Linux)
-        Platform.runLater(() -> {
-            // Delay for better feel
-            new Thread(() -> {
-                try {
-                    Thread.sleep(250); 
-                    Platform.runLater(transitionTimeline::play);
-                } catch (InterruptedException ignored) {}
-            }).start();
+    private void configureLoginHandler() {
+        loginController.setOnAuthenticated((user, remember) -> {
+            if (remember) sessionService.remember(user);
+            else sessionService.forget();
+            showMainApplication(user);
         });
     }
 
@@ -174,6 +174,9 @@ public class Main extends Application {
             mainStage.setScene(scene);
             mainStage.setMaximized(true);
             mainStage.show();
+            mainStage.toFront();
+            mainStage.requestFocus();
+            Platform.runLater(controller::requestInitialFocus);
         } catch (Exception e) {
             throw new IllegalStateException("Impossibile aprire l'applicazione", e);
         }
@@ -181,7 +184,8 @@ public class Main extends Application {
 
     private void showLoginScreen() {
         mainStage.setTitle("VoidReach CRM — Accesso");
-        Scene loginScene = new Scene(mainRoot);
+        configureLoginHandler();
+        Scene loginScene = new Scene(loginRoot);
         loginScene.setFill(Color.web("#0f172a"));
         loginScene.getStylesheets().add(getClass().getResource("/css/style-dark.css").toExternalForm());
         mainStage.setScene(loginScene);
@@ -189,6 +193,7 @@ public class Main extends Application {
         mainStage.setWidth(580);
         mainStage.setHeight(700);
         mainStage.centerOnScreen();
+        bringToFront(loginController::requestInitialFocus);
     }
 
     private void logout() {
@@ -196,18 +201,23 @@ public class Main extends Application {
         showLoginScreen();
     }
 
-    private void setupOSIcons() {
-        CompletableFuture.runAsync(() -> {
-            try {
-                if (Taskbar.isTaskbarSupported()) {
-                    Taskbar taskbar = Taskbar.getTaskbar();
-                    if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
-                        java.awt.Image dockIcon = Toolkit.getDefaultToolkit()
-                                .getImage(getClass().getResource("/images/app-icon.png"));
-                        taskbar.setIconImage(dockIcon);
-                    }
-                }
-            } catch (Exception ignored) {}
+    private void showMainStage(Runnable focusTarget) {
+        if (splashStage != null) splashStage.close();
+        mainStage.setOpacity(1.0);
+        bringToFront(focusTarget);
+    }
+
+    /** Focuses the JavaFX window without starting a second native GUI toolkit. */
+    private void bringToFront(Runnable focusTarget) {
+        mainStage.setIconified(false);
+        mainStage.show();
+        mainStage.toFront();
+        mainStage.requestFocus();
+        Platform.runLater(() -> {
+            if (!mainStage.isShowing()) return;
+            mainStage.toFront();
+            mainStage.requestFocus();
+            focusTarget.run();
         });
     }
 

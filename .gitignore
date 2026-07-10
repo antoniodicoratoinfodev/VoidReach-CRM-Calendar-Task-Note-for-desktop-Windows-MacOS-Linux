@@ -1,1 +1,7 @@
 /VoidReach-CRM-Final-No-FatJar/target/
+
+# macOS metadata
+.DS_Store
+
+# IDE metadata
+.idea/

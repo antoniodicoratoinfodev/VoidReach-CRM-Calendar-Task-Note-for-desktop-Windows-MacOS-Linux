@@ -12,6 +12,7 @@ public class UserAccount {
     private Instant createdAt;
     private String resetCodeHash;
     private Instant resetCodeExpiresAt;
+    private String avatarFileName;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -29,4 +30,6 @@ public class UserAccount {
     public void setResetCodeHash(String resetCodeHash) { this.resetCodeHash = resetCodeHash; }
     public Instant getResetCodeExpiresAt() { return resetCodeExpiresAt; }
     public void setResetCodeExpiresAt(Instant resetCodeExpiresAt) { this.resetCodeExpiresAt = resetCodeExpiresAt; }
+    public String getAvatarFileName() { return avatarFileName; }
+    public void setAvatarFileName(String avatarFileName) { this.avatarFileName = avatarFileName; }
 }

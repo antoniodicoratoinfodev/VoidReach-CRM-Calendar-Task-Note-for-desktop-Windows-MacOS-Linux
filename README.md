@@ -66,14 +66,14 @@ The left sidebar provides access to all sections:
 
 ## Requirements
 
-- Java JDK 17 or higher (developed and tested on JDK 25)
+- Java JDK 21 or higher
 - Apache Maven
 
 ---
 
 ## How to Run
 
-Clone the repository and, from the `CRM-APP` directory, run:
+Clone the repository and, from the `VoidReach-CRM-Final-No-FatJar` directory, run:
 
 ```bash
 mvn clean javafx:run
@@ -92,7 +92,7 @@ The project can also be opened and run directly from IntelliJ IDEA.
 ## Project Structure
 
 ```
-CRM-APP(WINDOWS-MAC-LINUX)/
+VoidReach-CRM-Final-No-FatJar/
 ├── pom.xml
 ├── run.sh
 └── src/

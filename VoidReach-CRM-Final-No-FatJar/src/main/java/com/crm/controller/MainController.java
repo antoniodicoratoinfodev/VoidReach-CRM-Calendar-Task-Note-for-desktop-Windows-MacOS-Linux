@@ -3,11 +3,17 @@ package com.crm.controller;
 import com.crm.model.Contact;
 import com.crm.model.Task;
 import com.crm.model.UserAccount;
+import com.crm.model.CrmDataSnapshot;
 import com.crm.repository.LocalUserRepository;
+import com.crm.repository.CrmDataRepository;
+import com.crm.repository.LocalCrmDataRepository;
+import com.crm.service.AvatarService;
 import com.crm.service.AuthService;
 import javafx.geometry.Side;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.beans.property.SimpleBooleanProperty;
+import javafx.css.PseudoClass;
 import javafx.collections.transformation.FilteredList;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
@@ -15,10 +21,18 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
 import javafx.scene.shape.Line;
 import javafx.stage.Stage;
+import javafx.stage.FileChooser;
 import org.kordamp.ikonli.javafx.FontIcon;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -28,8 +42,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.HashSet;
+import java.util.Set;
 
 public class MainController {
+
+    private static final long MAX_AVATAR_SIZE_BYTES = 20L * 1024 * 1024;
 
     @FXML private TableView<Contact> contactsTable;
     @FXML private TableColumn<Contact, String> nameColumn;
@@ -39,10 +57,12 @@ public class MainController {
     @FXML private TableColumn<Contact, String> phoneColumn;
     @FXML private TableColumn<Contact, String> lastInteractionColumn;
     @FXML private TableColumn<Contact, String> tagsColumn;
+    @FXML private TableColumn<Contact, Boolean> selectColumn;
     @FXML private TextField searchField;
     @FXML private ComboBox<String> rowsPerPageCombo;
     @FXML private Pagination contactsPagination;
     @FXML private Label paginationInfoLabel;
+    @FXML private Button selectContactsBtn;
 
     @FXML private VBox contactsView;
     @FXML private VBox calendarView;
@@ -50,11 +70,12 @@ public class MainController {
     @FXML private Label genericTitle;
     @FXML private FontIcon genericIcon;
     @FXML private VBox sidebarContainer;
-    @FXML private HBox navbarContainer;
     @FXML private Button themeToggleBtn;
     @FXML private FontIcon themeToggleIcon;
     @FXML private Label currentUserLabel;
     @FXML private Button accountMenuButton;
+    @FXML private FontIcon defaultAvatarIcon;
+    @FXML private ImageView avatarImage;
     
     @FXML private AnchorPane timeLabelsContainer;
     @FXML private AnchorPane calendarTimelineArea;
@@ -92,11 +113,25 @@ public class MainController {
     private Runnable logoutAction;
     private UserAccount currentUser;
     private final AuthService authService = new AuthService(new LocalUserRepository());
+    private final AvatarService avatarService = new AvatarService(new LocalUserRepository());
+    private final CrmDataRepository crmDataRepository = new LocalCrmDataRepository();
+    private boolean loadingUserData;
+    private boolean contactSelectionMode;
+    private final Set<Contact> checkedContacts = new HashSet<>();
+    private final Set<Contact> cutContacts = new HashSet<>();
+    private static final PseudoClass CUT_CONTACT = PseudoClass.getPseudoClass("cut-contact");
 
     public void setCurrentUser(UserAccount user, Runnable logoutAction) {
         this.currentUser = user;
         this.logoutAction = logoutAction;
         if (currentUserLabel != null) currentUserLabel.setText(user.getFullName());
+        refreshAvatar();
+        loadUserData();
+    }
+
+    /** Lets the user type in contact search immediately after the application opens. */
+    public void requestInitialFocus() {
+        javafx.application.Platform.runLater(searchField::requestFocus);
     }
 
     @FXML private void handleLogout() {
@@ -109,10 +144,93 @@ public class MainController {
         profile.setOnAction(e -> showProfileDialog());
         MenuItem security = new MenuItem("Sicurezza: cambia password");
         security.setOnAction(e -> showChangePasswordDialog());
+        MenuItem avatar = new MenuItem("Aggiorna icona profilo");
+        avatar.setOnAction(e -> chooseAvatar());
         MenuItem logout = new MenuItem("Esci dall'account");
         logout.setOnAction(e -> handleLogout());
-        ContextMenu menu = new ContextMenu(profile, security, new SeparatorMenuItem(), logout);
+        ContextMenu menu = new ContextMenu(profile, security, avatar, new SeparatorMenuItem(), logout);
         menu.show(accountMenuButton, Side.BOTTOM, 0, 6);
+    }
+
+    private void chooseAvatar() {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Scegli un'immagine profilo");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagini PNG e JPG", "*.png", "*.jpg", "*.jpeg"));
+        java.io.File selected = chooser.showOpenDialog(accountMenuButton.getScene().getWindow());
+        if (selected == null) return;
+        if (selected.length() > MAX_AVATAR_SIZE_BYTES) {
+            showError("Image too large", "Profile image must not exceed 20 MB.");
+            return;
+        }
+        Image image = new Image(selected.toURI().toString());
+        if (image.isError()) { showError("Immagine non valida", "Non è stato possibile aprire l'immagine selezionata."); return; }
+        showAvatarCropDialog(image);
+    }
+
+    private void showAvatarCropDialog(Image image) {
+        final double previewSize = 380;
+        final double cropSize = 250;
+        final double outputSize = 400;
+        Canvas canvas = new Canvas(previewSize, previewSize);
+
+        class CropRenderer {
+            double zoom = 1.0, offsetX, offsetY, dragX, dragY;
+            double baseScale() { return Math.max(cropSize / image.getWidth(), cropSize / image.getHeight()); }
+            void clampOffset() {
+                double width = image.getWidth() * baseScale() * zoom, height = image.getHeight() * baseScale() * zoom;
+                double maxX = Math.max(0, (width - cropSize) / 2), maxY = Math.max(0, (height - cropSize) / 2);
+                offsetX = Math.max(-maxX, Math.min(maxX, offsetX));
+                offsetY = Math.max(-maxY, Math.min(maxY, offsetY));
+            }
+            void drawCrop(GraphicsContext gc, double size, double diameter) {
+                double scale = Math.max(diameter / image.getWidth(), diameter / image.getHeight()) * zoom;
+                double x = (size - image.getWidth() * scale) / 2 + offsetX * (diameter / cropSize);
+                double y = (size - image.getHeight() * scale) / 2 + offsetY * (diameter / cropSize);
+                gc.drawImage(image, x, y, image.getWidth() * scale, image.getHeight() * scale);
+            }
+            void draw() {
+                GraphicsContext gc = canvas.getGraphicsContext2D(); gc.clearRect(0, 0, previewSize, previewSize);
+                gc.setFill(Color.web("#0f172a")); gc.fillRect(0, 0, previewSize, previewSize);
+                double backgroundScale = Math.min(previewSize / image.getWidth(), previewSize / image.getHeight());
+                double bgW = image.getWidth() * backgroundScale, bgH = image.getHeight() * backgroundScale;
+                gc.setGlobalAlpha(0.24); gc.drawImage(image, (previewSize - bgW) / 2, (previewSize - bgH) / 2, bgW, bgH); gc.setGlobalAlpha(1);
+                gc.setFill(Color.rgb(15, 23, 42, 0.55)); gc.fillRect(0, 0, previewSize, previewSize);
+                gc.save(); gc.beginPath(); gc.arc(previewSize / 2, previewSize / 2, cropSize / 2, cropSize / 2, 0, 360); gc.closePath(); gc.clip();
+                drawCrop(gc, previewSize, cropSize); gc.restore();
+                gc.setStroke(Color.web("#60a5fa")); gc.setLineWidth(3); gc.strokeOval((previewSize - cropSize) / 2, (previewSize - cropSize) / 2, cropSize, cropSize);
+            }
+            WritableImage createResult() {
+                Canvas result = new Canvas(outputSize, outputSize); GraphicsContext gc = result.getGraphicsContext2D();
+                gc.save(); gc.beginPath(); gc.arc(outputSize / 2, outputSize / 2, outputSize / 2, outputSize / 2, 0, 360); gc.closePath(); gc.clip();
+                drawCrop(gc, outputSize, outputSize); gc.restore();
+                return result.snapshot(null, null);
+            }
+        }
+        CropRenderer renderer = new CropRenderer(); renderer.draw();
+        canvas.setOnMousePressed(event -> { renderer.dragX = event.getX(); renderer.dragY = event.getY(); });
+        canvas.setOnMouseDragged(event -> { renderer.offsetX += event.getX() - renderer.dragX; renderer.offsetY += event.getY() - renderer.dragY; renderer.dragX = event.getX(); renderer.dragY = event.getY(); renderer.clampOffset(); renderer.draw(); });
+        Slider zoom = new Slider(1, 3, 1); zoom.setShowTickLabels(true); zoom.setMajorTickUnit(1); zoom.valueProperty().addListener((obs, old, value) -> { renderer.zoom = value.doubleValue(); renderer.clampOffset(); renderer.draw(); });
+
+        Dialog<ButtonType> dialog = new Dialog<>(); dialog.setTitle("Ritaglia immagine profilo"); applyThemeToDialog(dialog);
+        ButtonType save = new ButtonType("Usa questa immagine", ButtonBar.ButtonData.OK_DONE); dialog.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
+        Label help = new Label("Trascina l'immagine per scegliere l'inquadratura. Usa il cursore per ingrandirla."); help.setWrapText(true); help.getStyleClass().add("auth-subtitle");
+        VBox content = new VBox(14, help, canvas, new Label("Zoom"), zoom); content.setAlignment(javafx.geometry.Pos.CENTER); content.setPrefWidth(previewSize); dialog.getDialogPane().setContent(content);
+        if (dialog.showAndWait().filter(result -> result == save).isPresent()) {
+            try { avatarService.updateAvatar(currentUser, renderer.createResult()); refreshAvatar(); }
+            catch (IllegalStateException ex) { showError("Immagine non aggiornata", ex.getMessage()); }
+        }
+    }
+
+    private void refreshAvatar() {
+        if (currentUser == null || avatarImage == null) return;
+        java.nio.file.Path path = avatarService.getAvatarPath(currentUser);
+        boolean available = path != null && java.nio.file.Files.isRegularFile(path);
+        if (available) {
+            avatarImage.setImage(new Image(path.toUri().toString(), 27, 27, true, true));
+            avatarImage.setClip(new Circle(13.5, 13.5, 13.5));
+        }
+        avatarImage.setVisible(available);
+        defaultAvatarIcon.setVisible(!available);
     }
 
     private void showProfileDialog() {
@@ -156,6 +274,11 @@ public class MainController {
 
     @FXML
     public void initialize() {
+        // A hidden view must not take part in StackPane layout calculations.
+        contactsView.managedProperty().bind(contactsView.visibleProperty());
+        calendarView.managedProperty().bind(calendarView.visibleProperty());
+        genericView.managedProperty().bind(genericView.visibleProperty());
+
         filteredData = new FilteredList<>(contactData, p -> true);
         searchField.textProperty().addListener((obs, old, newValue) -> {
             filterContacts(newValue);
@@ -165,23 +288,22 @@ public class MainController {
         setupColumns();
         setupContactRowFactory();
         setupPagination();
-        loadDummyContacts();
+        updatePagination();
         
         LocalDate today = LocalDate.now();
         calendarDatePicker.setValue(today);
         currentMiniMonth = YearMonth.from(today);
         weekStartDate = getWeekStart(today);
         
-        addTaskToDatabase(today, new Task("Precision Meeting", "Discuss precision requirements.", 542, 182, "Blue"));
-        addTaskToDatabase(today, new Task("Quick Sync", "Weekly internal sync.", 840, 45, "Red"));
-        
         calendarDatePicker.valueProperty().addListener((obs, old, newValue) -> {
             if (newValue != null) {
+                currentMiniMonth = YearMonth.from(newValue);
                 if (currentViewMode.equals("Week")) {
                     weekStartDate = getWeekStart(newValue);
                 }
                 setupMainCalendar();
                 updateRightSidebar();
+                saveCurrentData();
             }
         });
 
@@ -191,7 +313,11 @@ public class MainController {
         updateThemeButton();
         
         contactsTable.setOnKeyPressed(event -> {
-            if (event.getCode() == KeyCode.DELETE || event.getCode() == KeyCode.BACK_SPACE) {
+            if (isShortcut(event, KeyCode.C)) {
+                copySelectedContacts(false); event.consume();
+            } else if (isShortcut(event, KeyCode.X)) {
+                copySelectedContacts(true); event.consume();
+            } else if (event.getCode() == KeyCode.DELETE || event.getCode() == KeyCode.BACK_SPACE) {
                 handleDeleteContact();
             }
         });
@@ -259,6 +385,7 @@ public class MainController {
         currentZoom = targetZoom;
         setupMainCalendar();
         calendarScrollPane.setHvalue(0);
+        saveCurrentData();
 
         javafx.application.Platform.runLater(() -> {
             double newContentHeight = getCalendarContentHeight();
@@ -312,6 +439,7 @@ public class MainController {
                 weekStartDate = getWeekStart(calendarDatePicker.getValue());
             }
             setupMainCalendar();
+            saveCurrentData();
         });
     }
 
@@ -373,7 +501,56 @@ public class MainController {
         taskDatabase.computeIfAbsent(date, k -> new ArrayList<>()).add(task);
     }
 
+    private void loadUserData() {
+        loadingUserData = true;
+        try {
+            CrmDataSnapshot data = crmDataRepository.loadForUser(currentUser.getId());
+            contactData.setAll(data.contacts());
+            checkedContacts.clear();
+            cutContacts.clear();
+            taskDatabase.clear();
+            data.tasksByDate().forEach((date, tasks) -> taskDatabase.put(date, new ArrayList<>(tasks)));
+            currentZoom = clamp(data.calendarZoom(), MIN_ZOOM, MAX_ZOOM);
+            currentViewMode = "Week".equals(data.calendarViewMode()) ? "Week" : "Day";
+            viewModeCombo.setValue(currentViewMode);
+            calendarDatePicker.setValue(data.selectedDate());
+            weekStartDate = getWeekStart(data.selectedDate());
+            currentMiniMonth = YearMonth.from(data.selectedDate());
+            updatePagination();
+            setupMainCalendar();
+            updateRightSidebar();
+        } finally {
+            loadingUserData = false;
+        }
+    }
+
+    private void saveCurrentData() {
+        if (currentUser == null || loadingUserData || calendarDatePicker.getValue() == null) return;
+        Map<LocalDate, List<Task>> tasksCopy = new HashMap<>();
+        taskDatabase.forEach((date, tasks) -> tasksCopy.put(date, new ArrayList<>(tasks)));
+        crmDataRepository.saveForUser(currentUser.getId(), new CrmDataSnapshot(
+                new ArrayList<>(contactData), tasksCopy, calendarDatePicker.getValue(), currentViewMode, currentZoom));
+    }
+
     private void setupColumns() {
+        selectColumn.setCellValueFactory(data -> new SimpleBooleanProperty(checkedContacts.contains(data.getValue())));
+        selectColumn.setCellFactory(column -> new TableCell<>() {
+            private final CheckBox checkBox = new CheckBox();
+            {
+                checkBox.getStyleClass().add("contact-select-check");
+                checkBox.setOnAction(event -> {
+                    Contact contact = getTableRow() == null ? null : getTableRow().getItem();
+                    if (contact == null) return;
+                    if (checkBox.isSelected()) checkedContacts.add(contact); else checkedContacts.remove(contact);
+                    contactsTable.refresh();
+                });
+            }
+            @Override protected void updateItem(Boolean selected, boolean empty) {
+                super.updateItem(selected, empty);
+                if (empty || !contactSelectionMode) setGraphic(null);
+                else { checkBox.setSelected(Boolean.TRUE.equals(selected)); setGraphic(checkBox); }
+            }
+        });
         nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
         companyColumn.setCellValueFactory(new PropertyValueFactory<>("company"));
         titleColumn.setCellValueFactory(new PropertyValueFactory<>("title"));
@@ -398,17 +575,15 @@ public class MainController {
 
     private void setupContactRowFactory() {
         contactsTable.setRowFactory(tv -> {
-            TableRow<Contact> row = new TableRow<>();
-            row.setOnMouseClicked(event -> { if (event.getClickCount() == 2 && (!row.isEmpty())) showContactDialog(row.getItem()); });
+            TableRow<Contact> row = new TableRow<>() {
+                @Override protected void updateItem(Contact item, boolean empty) {
+                    super.updateItem(item, empty);
+                    pseudoClassStateChanged(CUT_CONTACT, !empty && cutContacts.contains(item));
+                }
+            };
+            row.setOnMouseClicked(event -> { if (!contactSelectionMode && event.getClickCount() == 2 && (!row.isEmpty())) showContactDialog(row.getItem()); });
             return row;
         });
-    }
-
-    private void loadDummyContacts() {
-        for (int i = 1; i <= 50; i++) {
-            contactData.add(new Contact("Contact " + i, "Company " + i, "Title " + i, "email" + i + "@example.com", "+1 555-00" + i, "Yesterday", "Client"));
-        }
-        updatePagination();
     }
 
     private void setupMainCalendar() {
@@ -551,7 +726,7 @@ public class MainController {
                 updateTimeLabel(timeLabel, task.getStartMin(), task.getDuration());
             }
         });
-        taskBox.setOnMouseReleased(e -> { taskBox.getStyleClass().remove("task-entry-dragging"); updateRightSidebar(); });
+        taskBox.setOnMouseReleased(e -> { taskBox.getStyleClass().remove("task-entry-dragging"); updateRightSidebar(); saveCurrentData(); });
         taskBox.setFocusTraversable(true);
         taskBox.setOnMouseClicked(e -> {
             taskBox.requestFocus();
@@ -564,7 +739,7 @@ public class MainController {
             if (e.getCode() == KeyCode.BACK_SPACE || e.getCode() == KeyCode.DELETE) {
                 LocalDate date = currentViewMode.equals("Day") ? calendarDatePicker.getValue() : weekStartDate.plusDays(dayOffset);
                 taskDatabase.getOrDefault(date, new ArrayList<>()).remove(task);
-                setupMainCalendar(); updateRightSidebar();
+                setupMainCalendar(); updateRightSidebar(); saveCurrentData();
             }
         });
         taskBox.getChildren().addAll(tLabel, timeLabel, dLabel, spacer, resizer);
@@ -646,8 +821,6 @@ public class MainController {
         setupMainCalendar(); updateRightSidebar();
     }
 
-    @FXML private void handleViewModeChange() { /* Managed by listener */ }
-
     private void showTaskEditDialog(Task existingTask, int startMin, int duration, String desc) {
         Dialog<ButtonType> dialog = new Dialog<>(); dialog.setTitle(existingTask == null ? "New Task" : "Edit Task");
         applyThemeToDialog(dialog);
@@ -695,6 +868,7 @@ public class MainController {
                 }
             }
             setupMainCalendar(); updateRightSidebar();
+            saveCurrentData();
         }
     }
 
@@ -704,6 +878,8 @@ public class MainController {
         alert.setHeaderText(null);
         alert.setContentText(content);
         applyThemeToDialog(alert);
+        Node contentLabel = alert.getDialogPane().lookup(".content.label");
+        if (contentLabel != null) contentLabel.setStyle("-fx-text-fill: #fca5a5;");
         alert.showAndWait();
     }
 
@@ -739,23 +915,64 @@ public class MainController {
 
     private void updateActiveStyles(Button clickedBtn) {
         for (Node node : sidebarContainer.getChildren()) if (node instanceof Button) node.getStyleClass().remove("sidebar-button-active");
-        for (Node node : navbarContainer.getChildren()) if (node instanceof Button) node.getStyleClass().remove("nav-link-active");
-        if (clickedBtn != null) {
-            if (clickedBtn.getStyleClass().contains("sidebar-button")) clickedBtn.getStyleClass().add("sidebar-button-active");
-            else if (clickedBtn.getStyleClass().contains("nav-link")) clickedBtn.getStyleClass().add("nav-link-active");
+        if (clickedBtn != null && clickedBtn.getStyleClass().contains("sidebar-button")) {
+            clickedBtn.getStyleClass().add("sidebar-button-active");
         }
     }
 
     @FXML private void handleAddContact() { showContactDialog(null); }
+
+    @FXML private void handleToggleContactSelection() {
+        contactSelectionMode = !contactSelectionMode;
+        selectColumn.setVisible(contactSelectionMode);
+        selectContactsBtn.setText(contactSelectionMode ? "Done" : "Select");
+        contactsTable.getSelectionModel().setSelectionMode(contactSelectionMode ? SelectionMode.MULTIPLE : SelectionMode.SINGLE);
+        if (!contactSelectionMode) {
+            checkedContacts.clear(); cutContacts.clear(); contactsTable.getSelectionModel().clearSelection();
+        }
+        contactsTable.refresh();
+    }
+
+    private boolean isShortcut(KeyEvent event, KeyCode key) {
+        return event.getCode() == key && (event.isControlDown() || event.isMetaDown());
+    }
+
+    private List<Contact> getSelectedContacts() {
+        Set<Contact> selected = new HashSet<>(checkedContacts);
+        selected.addAll(contactsTable.getSelectionModel().getSelectedItems());
+        return new ArrayList<>(selected);
+    }
+
+    private void copySelectedContacts(boolean cut) {
+        List<Contact> selected = getSelectedContacts();
+        if (selected.isEmpty()) return;
+        StringBuilder text = new StringBuilder("Name\tCompany\tTitle\tEmail\tPhone\tTags\tDescription\n");
+        for (Contact contact : selected) {
+            text.append(clipboardValue(contact.nameProperty().get())).append('\t')
+                    .append(clipboardValue(contact.companyProperty().get())).append('\t')
+                    .append(clipboardValue(contact.titleProperty().get())).append('\t')
+                    .append(clipboardValue(contact.emailProperty().get())).append('\t')
+                    .append(clipboardValue(contact.phoneProperty().get())).append('\t')
+                    .append(clipboardValue(contact.tagsProperty().get())).append('\t')
+                    .append(clipboardValue(contact.descriptionProperty().get())).append('\n');
+        }
+        ClipboardContent content = new ClipboardContent(); content.putString(text.toString()); Clipboard.getSystemClipboard().setContent(content);
+        if (cut) { cutContacts.clear(); cutContacts.addAll(selected); }
+        contactsTable.refresh();
+    }
+
+    private String clipboardValue(String value) { return value == null ? "" : value.replace('\t', ' ').replace('\n', ' '); }
+
     @FXML private void handleDeleteContact() {
-        Contact selected = contactsTable.getSelectionModel().getSelectedItem();
-        if (selected != null) {
+        List<Contact> selected = getSelectedContacts();
+        if (!selected.isEmpty()) {
             Alert alert = new Alert(Alert.AlertType.CONFIRMATION); alert.setTitle("Delete Contact");
             applyThemeToDialog(alert);
-            alert.setHeaderText("Delete " + selected.nameProperty().get() + "?");
+            alert.setHeaderText(selected.size() == 1 ? "Delete " + selected.get(0).nameProperty().get() + "?" : "Delete " + selected.size() + " contacts?");
             alert.setContentText("This action cannot be undone.");
             if (alert.showAndWait().filter(r -> r == ButtonType.OK).isPresent()) {
-                contactData.remove(selected); updatePagination();
+                contactData.removeAll(selected); checkedContacts.removeAll(selected); cutContacts.removeAll(selected);
+                contactsTable.getSelectionModel().clearSelection(); updatePagination(); saveCurrentData();
             }
         }
     }
@@ -802,7 +1019,7 @@ public class MainController {
             }
             return null;
         });
-        dialog.showAndWait().ifPresent(c -> { if (contact == null) contactData.add(0, c); updatePagination(); contactsTable.refresh(); });
+        dialog.showAndWait().ifPresent(c -> { if (contact == null) contactData.add(0, c); updatePagination(); contactsTable.refresh(); saveCurrentData(); });
     }
 
     private void filterContacts(String searchText) {
@@ -832,6 +1049,9 @@ public class MainController {
 
     private void applyThemeToDialog(Dialog<?> dialog) {
         if (dialog == null) return;
+        if (themeToggleBtn != null && themeToggleBtn.getScene() != null) {
+            dialog.initOwner(themeToggleBtn.getScene().getWindow());
+        }
         DialogPane dp = dialog.getDialogPane();
         dp.getStylesheets().clear();
         dp.getStylesheets().add(getClass().getResource(isDarkMode ? "/css/style-dark.css" : "/css/style.css").toExternalForm());

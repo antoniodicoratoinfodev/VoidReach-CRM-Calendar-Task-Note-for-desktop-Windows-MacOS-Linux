@@ -59,7 +59,7 @@
     <center>
         <VBox>
             <!-- Navbar -->
-            <HBox fx:id="navbarContainer" styleClass="navbar" spacing="25" alignment="CENTER_LEFT">
+            <HBox styleClass="navbar" spacing="25" alignment="CENTER_LEFT">
                 <Region HBox.hgrow="ALWAYS"/>
                 
                 <HBox spacing="15" alignment="CENTER">
@@ -69,7 +69,10 @@
                         <graphic>
                             <HBox spacing="6" alignment="CENTER">
                                 <Label fx:id="currentUserLabel" text="Utente" style="-fx-font-weight: 600;"/>
-                                <FontIcon iconLiteral="fas-user-circle" iconSize="27" iconColor="#cbd5e1"/>
+                                <StackPane prefWidth="27" prefHeight="27">
+                                    <FontIcon fx:id="defaultAvatarIcon" iconLiteral="fas-user-circle" iconSize="27" iconColor="#cbd5e1"/>
+                                    <ImageView fx:id="avatarImage" fitWidth="27" fitHeight="27" preserveRatio="true" visible="false"/>
+                                </StackPane>
                             </HBox>
                         </graphic>
                     </Button>
@@ -84,6 +87,7 @@
                     
                     <HBox spacing="15" alignment="CENTER_LEFT">
                         <Button fx:id="addNewBtn" onAction="#handleAddContact" text="Add New" styleClass="btn-primary"/>
+                        <Button fx:id="selectContactsBtn" onAction="#handleToggleContactSelection" text="Select" styleClass="btn-secondary"/>
                         <Button fx:id="deleteBtn" onAction="#handleDeleteContact" text="Delete" styleClass="btn-secondary" style="-fx-text-fill: #ef4444;"/>
                         <Region HBox.hgrow="ALWAYS"/>
                         <Button fx:id="allContactsBtn" onAction="#handleShowAllContacts" text="All Contacts" styleClass="btn-secondary"/>
@@ -97,6 +101,7 @@
                             <TableView fx:constant="CONSTRAINED_RESIZE_POLICY"/>
                         </columnResizePolicy>
                         <columns>
+                            <TableColumn fx:id="selectColumn" text="" minWidth="42" maxWidth="42" prefWidth="42" visible="false"/>
                             <TableColumn fx:id="nameColumn" text="Name" minWidth="120"/>
                             <TableColumn fx:id="companyColumn" text="Company" minWidth="120"/>
                             <TableColumn fx:id="titleColumn" text="Title" minWidth="120"/>
@@ -124,7 +129,7 @@
                             <Button text="&gt;" onAction="#handleNextDay" style="-fx-background-color: transparent;"/>
                         </HBox>
                         <Region HBox.hgrow="ALWAYS"/>
-                        <ComboBox fx:id="viewModeCombo" prefWidth="100" promptText="Day" onAction="#handleViewModeChange"/>
+                        <ComboBox fx:id="viewModeCombo" prefWidth="100" promptText="Day"/>
                     </HBox>
                     <ScrollPane fx:id="calendarScrollPane" fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
                         <HBox spacing="0">
