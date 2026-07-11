@@ -1,6 +1,6 @@
 # VoidReach
 
-VoidReach is a desktop CRM application developed with Java 21 and JavaFX. It currently provides local contact, calendar, and activity management, account authentication, and persistent data storage on the user's computer.
+VoidReach is a desktop CRM application developed with Java 21 and JavaFX. It currently provides local contact, calendar, and task management, account authentication, and persistent data storage on the user's computer.
 
 > Current status: the **Contacts** and **Calendar** sections are operational. The other navigation items are present in the interface but still display an “under development” placeholder.
 
@@ -10,7 +10,7 @@ VoidReach is a desktop CRM application developed with Java 21 and JavaFX. It cur
 
 - Registration with name, email address, and a password of at least 8 characters.
 - Login and logout.
-- Password recovery through a six-digit code valid for 15 minutes. In this local version, the code is displayed directly in the application; no email is sent.
+- Password recovery through a six-digit code that remains valid for 15 minutes. In this local version, the code is displayed directly in the application; no email is sent.
 - Password changes and name updates from the account menu.
 - **Stay signed in on this device** option: only the account email is stored, never the password.
 - Passwords and password-recovery codes are stored as PBKDF2-derived values with a salt.
@@ -27,15 +27,15 @@ VoidReach is a desktop CRM application developed with Java 21 and JavaFX. It cur
 - Double-click a row to edit a contact.
 - Copy selected contacts to the clipboard with `Ctrl+C` on Windows/Linux or `Cmd+C` on macOS.
 
-### Calendar
+### Calendar and Task Management
 
 - **Day** and **Week** views on a 24-hour grid with 15-minute intervals.
-- Create an activity by clicking on the timeline.
-- Edit activities with a double-click or right-click.
-- Reschedule activities with drag and drop.
-- Resize an activity by dragging its bottom edge.
+- Create a task by clicking on the timeline.
+- Edit tasks with a double-click or right-click.
+- Reschedule tasks with drag and drop.
+- Resize a task by dragging its bottom edge.
 - Edit the date, start time, end time, description, and color.
-- Minimum duration of 5 minutes; activities must remain within the same day.
+- Tasks must last at least 5 minutes and remain within the same day.
 - Available colors: `Blue`, `Red`, `Green`, `Yellow`, `Orange`, and `Purple`.
 - Navigate to the previous or next day and return to today.
 - Timeline zoom from 0.75x to 3x with `Ctrl`/`Cmd` + mouse wheel; `Ctrl+0`/`Cmd+0` resets the zoom.
@@ -44,13 +44,13 @@ VoidReach is a desktop CRM application developed with Java 21 and JavaFX. It cur
 
 - Monthly mini-calendar with month navigation.
 - Selected day and current day highlighting.
-- List of activities for the selected day; clicking an activity opens the Calendar view.
+- List of tasks for the selected day; clicking a task opens the Calendar view.
 - Dark and light themes selectable from the sidebar.
 - Profile avatar support for PNG and JPG images, with preview, circular cropping, and zoom.
 
 ### Sections Not Yet Implemented
 
-The **Home**, **Dashboard**, **Leads**, **Opportunities**, **Accounts**, **Tasks**, and **Settings** items are navigable but currently display a placeholder. **Tasks** is not a standalone section: activity management is integrated into the **Calendar**.
+The **Home**, **Dashboard**, **Leads**, **Opportunities**, **Accounts**, **Tasks**, and **Settings** items are navigable but currently display a placeholder. **Tasks** is not a standalone section: task management is integrated into the **Calendar**.
 
 The application does not currently include Google Calendar synchronization, a remote database, email delivery, or online multi-user management.
 
@@ -63,16 +63,16 @@ Data is stored in the `.voidreach-crm` directory inside the user's home director
 ├── users.properties                         # accounts and derived credentials
 ├── users.properties.bak                     # previous revision, when available
 ├── session.properties                      # remembered-session email
-├── data/<account-id>.properties             # contacts, activities, and calendar preferences
+├── data/<account-id>.properties             # contacts, tasks, and calendar preferences
 ├── data/<account-id>.properties.bak         # atomic backup of the data file
 ├── avatars/<account-id>-<uuid>.png          # cropped avatar saved as PNG
 └── backup/<account-id>/                     # automatic CRM data backups
     └── crm-data-<timestamp>.properties      # up to 3 copies are retained
 ```
 
-Primary saves are atomic. If a file is corrupted, the application attempts to recover the `.bak` revision. Unreadable records are isolated in files with the `.corrupt.properties` suffix instead of necessarily preventing all other data from being loaded.
+Primary saves are atomic. If a file is corrupted, the application attempts to recover the previous `.bak` revision. Unreadable records are isolated in files with the `.corrupt.properties` suffix so that the remaining valid data can still be loaded when possible.
 
-Avatars support PNG and JPG/JPEG images from 300×300 up to 20,000×20,000 pixels, with a maximum file size of 10 MB. Images are processed with memory limits and saved as a PNG master image up to 1024×1024 pixels.
+Avatars support PNG and JPG/JPEG images ranging from 300×300 to 20,000×20,000 pixels, with a maximum file size of 10 MB. Images are processed with bounded memory usage and saved as a PNG master image of up to 1024×1024 pixels.
 
 ## Requirements
 
@@ -107,7 +107,7 @@ cd VoidReach-CRM-Final-No-FatJar
 mvn test
 ```
 
-The large-image integration test is separated into the `avatar-large-image` profile:
+The large-image integration test runs through the `avatar-large-image` profile:
 
 ```bash
 mvn verify -Pavatar-large-image
