@@ -13,6 +13,9 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonBar;
+import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -105,9 +108,10 @@ public class Main extends Application {
                 if (rememberedUser != null) loadAndShowRememberedApp();
                 else transitionToLogin();
             } catch (Exception ex) {
-                throw new IllegalStateException("Impossibile caricare l'interfaccia", ex);
+                recoverFromStartupFailure(ex);
             }
         });
+        loadTask.setOnFailed(e -> recoverFromStartupFailure(loadTask.getException()));
 
         Thread loaderThread = new Thread(loadTask, "voidreach-startup-loader");
         loaderThread.setDaemon(true);
@@ -163,9 +167,15 @@ public class Main extends Application {
 
     private void configureLoginHandler() {
         loginController.setOnAuthenticated((user, remember) -> {
-            if (remember) sessionService.remember(user);
-            else sessionService.forget();
+            String persistenceWarning = null;
+            try {
+                if (remember) sessionService.remember(user);
+                else sessionService.forget();
+            } catch (IllegalStateException e) {
+                persistenceWarning = "L'accesso è riuscito, ma non è stato possibile aggiornare la sessione salvata.";
+            }
             showMainApplication(user);
+            if (persistenceWarning != null) showPersistenceWarning(persistenceWarning);
         });
     }
 
@@ -208,12 +218,72 @@ public class Main extends Application {
     }
 
     private void logout() {
-        sessionService.forget();
+        String persistenceWarning = null;
+        try { sessionService.forget(); }
+        catch (IllegalStateException e) { persistenceWarning = "La sessione salvata non è stata rimossa dal disco."; }
         showLoginScreen();
+        if (persistenceWarning != null) showPersistenceWarning(persistenceWarning);
+    }
+
+    private void showPersistenceWarning(String message) {
+        Alert alert = new Alert(Alert.AlertType.WARNING);
+        alert.setTitle("Salvataggio locale non riuscito");
+        alert.setHeaderText(null);
+        alert.setContentText(message + " I dati già aperti restano disponibili in questa sessione.");
+        alert.showAndWait();
+    }
+
+    /** Closes the splash and offers a usable login screen even when startup data cannot be loaded. */
+    private void recoverFromStartupFailure(Throwable failure) {
+        closeSplashStage();
+        try {
+            rememberedUser = null;
+            if (loginRoot == null || loginController == null) loadLoginView();
+            transitionToLogin();
+
+            ButtonType retry = new ButtonType("Riprova avvio", ButtonBar.ButtonData.OK_DONE);
+            ButtonType continueToLogin = new ButtonType("Continua al login", ButtonBar.ButtonData.CANCEL_CLOSE);
+            Alert alert = new Alert(Alert.AlertType.ERROR);
+            alert.setTitle("Avvio in modalità recupero");
+            alert.setHeaderText("Non è stato possibile completare il caricamento iniziale.");
+            alert.setContentText("Lo splash è stato chiuso. Puoi accedere manualmente oppure riprovare il caricamento.");
+            alert.getButtonTypes().setAll(retry, continueToLogin);
+            if (alert.showAndWait().filter(retry::equals).isPresent()) retryStartup();
+        } catch (Exception recoveryFailure) {
+            showUnrecoverableStartupError(failure, recoveryFailure);
+        }
+    }
+
+    private void retryStartup() {
+        try {
+            showSplashScreen();
+        } catch (Exception retryFailure) {
+            recoverFromStartupFailure(retryFailure);
+        }
+    }
+
+    private void showUnrecoverableStartupError(Throwable failure, Exception recoveryFailure) {
+        if (failure != null) recoveryFailure.addSuppressed(failure);
+        ButtonType retry = new ButtonType("Riprova", ButtonBar.ButtonData.OK_DONE);
+        ButtonType close = new ButtonType("Chiudi", ButtonBar.ButtonData.CANCEL_CLOSE);
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle("Avvio non riuscito");
+        alert.setHeaderText("Non è stato possibile aprire nemmeno la schermata di accesso.");
+        alert.setContentText("Puoi riprovare. Se il problema continua, conserva i file .bak e .corrupt.properties per il recupero.");
+        alert.getButtonTypes().setAll(retry, close);
+        if (alert.showAndWait().filter(retry::equals).isPresent()) retryStartup();
+        else Platform.exit();
+    }
+
+    private void closeSplashStage() {
+        if (splashStage != null) {
+            splashStage.close();
+            splashStage = null;
+        }
     }
 
     private void showMainStage(Runnable focusTarget) {
-        if (splashStage != null) splashStage.close();
+        closeSplashStage();
         mainStage.setOpacity(1.0);
         bringToFront(focusTarget);
     }

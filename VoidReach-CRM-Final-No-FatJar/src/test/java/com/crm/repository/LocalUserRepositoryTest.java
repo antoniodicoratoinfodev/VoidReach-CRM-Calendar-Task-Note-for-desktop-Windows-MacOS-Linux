@@ -1,0 +1,69 @@
+package com.crm.repository;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.crm.model.UserAccount;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.Properties;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+class LocalUserRepositoryTest {
+    @TempDir Path directory;
+
+    @Test void corruptAccountDoesNotBlockValidAccountsAndIsQuarantined() throws Exception {
+        LocalUserRepository repository = new LocalUserRepository(directory);
+        UserAccount corrupt = account("corrupt-id", "corrupt@example.com", "Corrupt User");
+        UserAccount valid = account("valid-id", "valid@example.com", "Valid User");
+        repository.save(corrupt);
+        repository.save(valid);
+
+        Path usersFile = directory.resolve("users.properties");
+        Properties stored = load(usersFile);
+        stored.setProperty("user.corrupt-id.createdAt", encode("not-an-instant"));
+        storeDirectly(usersFile, stored);
+
+        UserAccount loaded = repository.findByEmail("valid@example.com").orElseThrow();
+        assertEquals("valid-id", loaded.getId());
+        assertTrue(repository.findByEmail("corrupt@example.com").isEmpty());
+        assertTrue(Files.isRegularFile(directory.resolve("users.properties.corrupt.properties")));
+
+        repository.save(valid);
+        Properties sanitized = load(usersFile);
+        assertFalse(sanitized.stringPropertyNames().stream().anyMatch(key -> key.startsWith("user.corrupt-id.")));
+        assertTrue(sanitized.stringPropertyNames().stream().anyMatch(key -> key.startsWith("user.valid-id.")));
+    }
+
+    private static UserAccount account(String id, String email, String name) {
+        UserAccount account = new UserAccount();
+        account.setId(id);
+        account.setEmail(email);
+        account.setFullName(name);
+        account.setPasswordHash("hash");
+        account.setPasswordSalt("salt");
+        account.setCreatedAt(Instant.parse("2026-07-11T12:00:00Z"));
+        return account;
+    }
+
+    private static Properties load(Path file) throws Exception {
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(file)) { properties.load(input); }
+        return properties;
+    }
+
+    private static void storeDirectly(Path file, Properties properties) throws Exception {
+        try (OutputStream output = Files.newOutputStream(file)) { properties.store(output, "test corruption"); }
+    }
+
+    private static String encode(String value) {
+        return Base64.getEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+}

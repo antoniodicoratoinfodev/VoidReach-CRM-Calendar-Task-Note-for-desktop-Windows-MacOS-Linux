@@ -6,6 +6,7 @@ import com.crm.model.UserAccount;
 import com.crm.model.CrmDataSnapshot;
 import com.crm.repository.LocalUserRepository;
 import com.crm.repository.CrmDataRepository;
+import com.crm.repository.CrmBackupService;
 import com.crm.repository.LocalCrmDataRepository;
 import com.crm.service.AvatarImageProcessor;
 import com.crm.service.AvatarImageProcessor.CropRegion;
@@ -129,6 +130,7 @@ public class MainController {
     private final AuthService authService = new AuthService(new LocalUserRepository());
     private final AvatarService avatarService = new AvatarService(new LocalUserRepository());
     private final CrmDataRepository crmDataRepository = new LocalCrmDataRepository();
+    private final CrmBackupService crmBackupService = new CrmBackupService();
     private final ChangeListener<Number> avatarScaleListener = (observable, oldValue, newValue) -> refreshAvatar();
     private final WeakChangeListener<Number> weakAvatarScaleListener = new WeakChangeListener<>(avatarScaleListener);
     private Window avatarScaleWindow;
@@ -146,6 +148,7 @@ public class MainController {
             refreshAvatar();
         });
         loadUserData();
+        crmBackupService.start(user.getId());
     }
 
     /** Lets the user type in contact search immediately after the application opens. */
@@ -154,6 +157,7 @@ public class MainController {
     }
 
     @FXML private void handleLogout() {
+        crmBackupService.close();
         if (logoutAction != null) logoutAction.run();
     }
 
@@ -427,6 +431,7 @@ public class MainController {
         if (dialog.showAndWait().filter(result -> result == save).isPresent()) {
             try { authService.updateProfile(currentUser, name.getText()); currentUserLabel.setText(currentUser.getFullName()); }
             catch (IllegalArgumentException ex) { showError("Profilo non aggiornato", ex.getMessage()); }
+            catch (IllegalStateException ex) { showError("Profilo non salvato", "Non è stato possibile salvare il profilo. Il lavoro resta aperto in questa sessione e potrai riprovare."); }
         }
     }
 
@@ -452,6 +457,7 @@ public class MainController {
                     authService.changePassword(currentUser, current.getText(), next.getText());
                     passwordChanged = true;
                 } catch (IllegalArgumentException ex) { errorMessage = ex.getMessage(); }
+                catch (IllegalStateException ex) { errorMessage = "Non è stato possibile salvare la password. Riprova senza chiudere l'app."; }
             }
         } finally {
             current.clear();
@@ -715,30 +721,44 @@ public class MainController {
         loadingUserData = true;
         try {
             CrmDataSnapshot data = crmDataRepository.loadForUser(currentUser.getId());
-            contactData.setAll(data.contacts());
-            checkedContacts.clear();
-            taskDatabase.clear();
-            data.tasksByDate().forEach((date, tasks) -> taskDatabase.put(date, new ArrayList<>(tasks)));
-            currentZoom = clamp(data.calendarZoom(), MIN_ZOOM, MAX_ZOOM);
-            currentViewMode = "Week".equals(data.calendarViewMode()) ? "Week" : "Day";
-            viewModeCombo.setValue(currentViewMode);
-            calendarDatePicker.setValue(data.selectedDate());
-            weekStartDate = getWeekStart(data.selectedDate());
-            currentMiniMonth = YearMonth.from(data.selectedDate());
-            updatePagination();
-            setupMainCalendar();
-            updateRightSidebar();
+            applyUserData(data);
+        } catch (IllegalStateException e) {
+            LocalDate today = LocalDate.now();
+            applyUserData(new CrmDataSnapshot(new ArrayList<>(), new HashMap<>(), today, "Day", 1.0));
+            Platform.runLater(() -> showError("Dati locali non leggibili",
+                    "Non è stato possibile recuperare il file dati né il suo backup. L'area di lavoro resta aperta senza sovrascrivere il file finché non effettui una modifica."));
         } finally {
             loadingUserData = false;
         }
+    }
+
+    private void applyUserData(CrmDataSnapshot data) {
+        contactData.setAll(data.contacts());
+        checkedContacts.clear();
+        taskDatabase.clear();
+        data.tasksByDate().forEach((date, tasks) -> taskDatabase.put(date, new ArrayList<>(tasks)));
+        currentZoom = clamp(data.calendarZoom(), MIN_ZOOM, MAX_ZOOM);
+        currentViewMode = "Week".equals(data.calendarViewMode()) ? "Week" : "Day";
+        viewModeCombo.setValue(currentViewMode);
+        calendarDatePicker.setValue(data.selectedDate());
+        weekStartDate = getWeekStart(data.selectedDate());
+        currentMiniMonth = YearMonth.from(data.selectedDate());
+        updatePagination();
+        setupMainCalendar();
+        updateRightSidebar();
     }
 
     private void saveCurrentData() {
         if (currentUser == null || loadingUserData || calendarDatePicker.getValue() == null) return;
         Map<LocalDate, List<Task>> tasksCopy = new HashMap<>();
         taskDatabase.forEach((date, tasks) -> tasksCopy.put(date, new ArrayList<>(tasks)));
-        crmDataRepository.saveForUser(currentUser.getId(), new CrmDataSnapshot(
-                new ArrayList<>(contactData), tasksCopy, calendarDatePicker.getValue(), currentViewMode, currentZoom));
+        try {
+            crmDataRepository.saveForUser(currentUser.getId(), new CrmDataSnapshot(
+                    new ArrayList<>(contactData), tasksCopy, calendarDatePicker.getValue(), currentViewMode, currentZoom));
+        } catch (IllegalStateException e) {
+            // The UI model is intentionally left untouched, so the user can retry without losing current work.
+            showError("Dati non salvati", "Non è stato possibile salvare i dati sul disco. Il lavoro resta aperto in questa sessione e potrai riprovare.");
+        }
     }
 
     private void setupColumns() {
@@ -882,7 +902,7 @@ public class MainController {
     private void renderDayView(double zoomedMinuteHeight) {
         calendarTimelineArea.setOnMouseClicked(e -> {
             if (e.getClickCount() == 1 && e.getTarget() == calendarTimelineArea && e.getButton() == MouseButton.PRIMARY) {
-                showTaskEditDialog(null, (int)(e.getY() / zoomedMinuteHeight), 60, "");
+                showNewTaskDialogAt((int) (e.getY() / zoomedMinuteHeight));
             }
         });
         List<Task> tasks = taskDatabase.getOrDefault(calendarDatePicker.getValue(), new ArrayList<>());
@@ -910,10 +930,17 @@ public class MainController {
                 int dayOffset = (int)(e.getX() / dayWidth);
                 if (dayOffset >= 0 && dayOffset < 7) {
                     calendarDatePicker.setValue(weekStartDate.plusDays(dayOffset));
-                    showTaskEditDialog(null, (int)(e.getY() / zoomedMinuteHeight), 60, "");
+                    showNewTaskDialogAt((int) (e.getY() / zoomedMinuteHeight));
                 }
             }
         });
+    }
+
+    private void showNewTaskDialogAt(int requestedStartMinute) {
+        int startMinute = Math.max(0, Math.min(
+                Task.MINUTES_PER_DAY - Task.MIN_DURATION_MINUTES, requestedStartMinute));
+        int duration = Math.min(60, Task.MINUTES_PER_DAY - startMinute);
+        showTaskEditDialog(null, startMinute, duration, "");
     }
 
     private void renderTaskOnTimeline(Task task, double zoomedMinuteHeight, double widthPercent, int dayOffset, double margin) {
@@ -939,7 +966,9 @@ public class MainController {
         resizer.setOnMousePressed(e -> { dragAnchorY = e.getScreenY(); e.consume(); });
         resizer.setOnMouseDragged(e -> {
             double deltaY = e.getScreenY() - dragAnchorY;
-            task.setDuration(Math.max(5, task.getDuration() + (int)(deltaY / zoomedMinuteHeight)));
+            int proposedDuration = task.getDuration() + (int) (deltaY / zoomedMinuteHeight);
+            int maximumDuration = Task.MINUTES_PER_DAY - task.getStartMin();
+            task.setDuration(Math.max(Task.MIN_DURATION_MINUTES, Math.min(maximumDuration, proposedDuration)));
             taskBox.setPrefHeight(task.getDuration() * zoomedMinuteHeight);
             updateTimeLabel(timeLabel, task.getStartMin(), task.getDuration());
             dragAnchorY = e.getScreenY(); updateRightSidebar(); e.consume();
@@ -957,7 +986,9 @@ public class MainController {
         taskBox.setOnMouseDragged(e -> {
             if (e.isPrimaryButtonDown()) {
                 double deltaY = e.getSceneY() - dragAnchorY;
-                task.setStartMin(Math.max(0, (int)((dragInitialTop + deltaY) / zoomedMinuteHeight)));
+                int proposedStart = (int) ((dragInitialTop + deltaY) / zoomedMinuteHeight);
+                int maximumStart = Task.MINUTES_PER_DAY - task.getDuration();
+                task.setStartMin(Math.max(0, Math.min(maximumStart, proposedStart)));
                 AnchorPane.setTopAnchor(taskBox, task.getStartMin() * zoomedMinuteHeight);
                 if (currentViewMode.equals("Week")) {
                     double dayWidth = getTimelineWidth() / 7.0;
@@ -1124,19 +1155,35 @@ public class MainController {
                     int sm = Integer.parseInt(sM.getText().trim());
                     int eh = Integer.parseInt(eH.getText().trim());
                     int em = Integer.parseInt(eM.getText().trim());
-                    if (sh < 0 || sh > 23 || sm < 0 || sm > 59 || eh < 0 || eh > 23 || em < 0 || em > 59) throw new NumberFormatException();
+                    boolean invalidStart = sh < 0 || sh > 23 || sm < 0 || sm > 59;
+                    boolean invalidEnd = eh < 0 || eh > 24 || em < 0 || em > 59 || eh == 24 && em != 0;
+                    if (invalidStart || invalidEnd) throw new NumberFormatException();
                     LocalDate targetDate = taskDatePicker.getValue();
                     if (targetDate == null) {
                         showError("Invalid Date", "Please choose a date for the activity.");
                         return;
                     }
 
-                    if (existingTask != null) removeTaskFromDatabase(sourceDate, existingTask);
                     int ns = sh * 60 + sm; int ne = eh * 60 + em;
-                    addTaskToDatabase(targetDate, new Task(titleField.getText(), descField.getText(), ns, Math.max(5, ne - ns), colorPicker.getValue()));
+                    if (ne <= ns) {
+                        showError("Invalid Time", "The end time must be after the start time.");
+                        return;
+                    }
+                    if (ne - ns < Task.MIN_DURATION_MINUTES) {
+                        showError("Invalid Time", "An activity must last at least 5 minutes.");
+                        return;
+                    }
+                    Task replacement = existingTask == null
+                            ? new Task(titleField.getText(), descField.getText(), ns, ne - ns, colorPicker.getValue())
+                            : new Task(existingTask.getId(), titleField.getText(), descField.getText(), ns, ne - ns, colorPicker.getValue());
+                    if (existingTask != null) removeTaskFromDatabase(sourceDate, existingTask);
+                    addTaskToDatabase(targetDate, replacement);
                     dateToDisplay = targetDate;
                 } catch (NumberFormatException ex) {
-                    showError("Invalid Time", "Please enter valid hours (0-23) and minutes (0-59).");
+                    showError("Invalid Time", "Use 00:00–23:59 for the start and up to 24:00 for the end.");
+                    return;
+                } catch (IllegalArgumentException ex) {
+                    showError("Invalid Time", ex.getMessage());
                     return;
                 }
             }

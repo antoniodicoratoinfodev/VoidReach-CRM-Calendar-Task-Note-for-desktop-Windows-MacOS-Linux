@@ -62,6 +62,9 @@ public class LoginController {
         } catch (IllegalArgumentException e) {
             loginMessage.setText(e.getMessage());
             return;
+        } catch (IllegalStateException e) {
+            loginMessage.setText("Impossibile leggere i dati locali. Il backup verrà usato se disponibile.");
+            return;
         } finally {
             loginPassword.clear();
         }
@@ -75,6 +78,9 @@ public class LoginController {
             user = auth.register(registerName.getText(), registerEmail.getText(), registerPassword.getText());
         } catch (IllegalArgumentException e) {
             registerMessage.setText(e.getMessage());
+            return;
+        } catch (IllegalStateException e) {
+            registerMessage.setText("Impossibile salvare l'account. Riprova senza chiudere l'app.");
             return;
         } finally {
             registerPassword.clear();
@@ -92,6 +98,7 @@ public class LoginController {
             resetEmail.setText(email);
             resetMessage.setText("Codice locale generato. Per questa demo: " + code + " (valido 15 minuti).");
         } catch (IllegalArgumentException e) { recoveryMessage.setText(e.getMessage()); }
+        catch (IllegalStateException e) { recoveryMessage.setText("Impossibile salvare la richiesta di recupero. Riprova senza chiudere l'app."); }
     }
 
     @FXML private void handleReset() {
@@ -102,6 +109,9 @@ public class LoginController {
             auth.resetPassword(email, resetCode.getText(), resetPassword.getText());
         } catch (IllegalArgumentException e) {
             resetMessage.setText(e.getMessage());
+            return;
+        } catch (IllegalStateException e) {
+            resetMessage.setText("Impossibile salvare la nuova password. Riprova senza chiudere l'app.");
             return;
         } finally {
             resetPassword.clear();
