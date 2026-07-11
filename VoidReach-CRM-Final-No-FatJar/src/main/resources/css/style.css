@@ -65,6 +65,17 @@
     -fx-border-width: 0 0 1 0;
 }
 
+.account-menu-button {
+    -fx-background-color: #f1f5f9;
+    -fx-padding: 4 8;
+    -fx-cursor: hand;
+    -fx-background-radius: 26;
+}
+
+.account-menu-button:hover {
+    -fx-background-color: #e2e8f0;
+}
+
 /* Content */
 .content-area {
     -fx-padding: 32;

@@ -532,7 +532,7 @@
 .auth-checkbox:selected .mark { -fx-background-color: white; }
 .auth-checkbox:selected .box { -fx-background-color: #2563eb; }
 
-.account-menu-button { -fx-background-color: #1e293b; -fx-padding: 5 8; -fx-cursor: hand; -fx-background-radius: 18; }
+.account-menu-button { -fx-background-color: #1e293b; -fx-padding: 4 8; -fx-cursor: hand; -fx-background-radius: 26; }
 .account-menu-button:hover { -fx-background-color: #334155; }
 
 /* Multi-contact selection */

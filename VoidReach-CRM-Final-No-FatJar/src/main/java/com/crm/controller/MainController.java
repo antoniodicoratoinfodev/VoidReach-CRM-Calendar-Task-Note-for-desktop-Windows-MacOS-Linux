@@ -229,8 +229,8 @@ public class MainController {
         java.nio.file.Path path = avatarService.getAvatarPath(currentUser);
         boolean available = path != null && java.nio.file.Files.isRegularFile(path);
         if (available) {
-            avatarImage.setImage(new Image(path.toUri().toString(), 27, 27, true, true));
-            avatarImage.setClip(new Circle(13.5, 13.5, 13.5));
+            avatarImage.setImage(new Image(path.toUri().toString(), 44, 44, true, true));
+            avatarImage.setClip(new Circle(22, 22, 22));
         }
         avatarImage.setVisible(available);
         defaultAvatarIcon.setVisible(!available);

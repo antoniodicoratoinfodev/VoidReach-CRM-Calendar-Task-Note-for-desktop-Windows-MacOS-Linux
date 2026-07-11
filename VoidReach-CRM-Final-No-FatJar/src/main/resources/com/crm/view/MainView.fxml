@@ -67,11 +67,11 @@
                     <FontIcon iconLiteral="fas-bell" iconSize="16" iconColor="#94a3b8"/>
                     <Button fx:id="accountMenuButton" onAction="#handleAccountMenu" styleClass="account-menu-button">
                         <graphic>
-                            <HBox spacing="6" alignment="CENTER">
+                            <HBox spacing="8" alignment="CENTER">
                                 <Label fx:id="currentUserLabel" text="Utente" style="-fx-font-weight: 600;"/>
-                                <StackPane prefWidth="27" prefHeight="27">
-                                    <FontIcon fx:id="defaultAvatarIcon" iconLiteral="fas-user-circle" iconSize="27" iconColor="#cbd5e1"/>
-                                    <ImageView fx:id="avatarImage" fitWidth="27" fitHeight="27" preserveRatio="true" visible="false"/>
+                                <StackPane prefWidth="44" prefHeight="44">
+                                    <FontIcon fx:id="defaultAvatarIcon" iconLiteral="fas-user-circle" iconSize="44" iconColor="#cbd5e1"/>
+                                    <ImageView fx:id="avatarImage" fitWidth="44" fitHeight="44" preserveRatio="true" visible="false"/>
                                 </StackPane>
                             </HBox>
                         </graphic>
