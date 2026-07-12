@@ -127,7 +127,7 @@
                 <!-- Google Calendar View -->
                 <VBox fx:id="calendarView" visible="false" styleClass="calendar-container">
                     <HBox styleClass="calendar-header" alignment="CENTER_LEFT" spacing="20">
-                        <DatePicker fx:id="calendarDatePicker" prefWidth="180" style="-fx-font-size: 14px;"/>
+                        <DatePicker fx:id="calendarDatePicker" prefWidth="180" styleClass="calendar-date-picker" style="-fx-font-size: 14px;"/>
                         <Button text="Today" onAction="#handleToday" styleClass="btn-today"/>
                         <HBox spacing="5">
                             <Button text="&lt;" onAction="#handlePrevDay" style="-fx-background-color: transparent;"/>
