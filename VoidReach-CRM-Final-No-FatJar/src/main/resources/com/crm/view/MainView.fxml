@@ -7,6 +7,7 @@
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.shape.Circle?>
+<?import org.fxmisc.richtext.CodeArea?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
 <BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
@@ -41,6 +42,9 @@
                 </Button>
                 <Button fx:id="sideTasksBtn" text="Tasks" onAction="#handleNavigation" styleClass="sidebar-button">
                     <graphic><FontIcon iconLiteral="fas-tasks" iconSize="16" styleClass="nav-icon"/></graphic>
+                </Button>
+                <Button fx:id="sideNotesBtn" text="Notes" onAction="#handleNavigation" styleClass="sidebar-button">
+                    <graphic><FontIcon iconLiteral="fas-sticky-note" iconSize="16" styleClass="nav-icon"/></graphic>
                 </Button>
                 <Region VBox.vgrow="ALWAYS"/>
                 <Separator styleClass="nav-separator"/>
@@ -351,6 +355,91 @@
                         </ScrollPane>
                         <Label fx:id="tasksEmptyLabel" text="There are no tasks yet." wrapText="true" styleClass="tasks-empty"/>
                     </VBox>
+                </VBox>
+
+                <VBox fx:id="notesView" visible="false" styleClass="notes-view" VBox.vgrow="ALWAYS">
+                    <StackPane VBox.vgrow="ALWAYS">
+                        <VBox fx:id="notesLibraryPane" spacing="18" styleClass="content-area, notes-library">
+                            <HBox alignment="BOTTOM_LEFT">
+                                <VBox spacing="5">
+                                    <Label text="KNOWLEDGE" styleClass="page-eyebrow"/>
+                                    <Label text="Notes" styleClass="section-title"/>
+                                    <Label text="Capture ideas, plans, and context connected to your work." styleClass="section-subtitle"/>
+                                </VBox>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Button text="New note" onAction="#handleAddNote" styleClass="btn-primary">
+                                    <graphic><FontIcon iconLiteral="fas-plus" iconSize="13" styleClass="button-icon-light"/></graphic>
+                                </Button>
+                            </HBox>
+                            <HBox spacing="10" alignment="CENTER_LEFT" styleClass="toolbar-card">
+                                <TextField fx:id="notesSearchField" promptText="Search notes…" styleClass="search-bar" HBox.hgrow="ALWAYS"/>
+                                <Label fx:id="notesCountLabel" text="0 notes" styleClass="pagination-info"/>
+                            </HBox>
+                            <ScrollPane fitToWidth="true" hbarPolicy="NEVER" styleClass="notes-scroll" VBox.vgrow="ALWAYS">
+                                <TilePane fx:id="notesGrid" prefColumns="3" hgap="14" vgap="14" styleClass="notes-grid"/>
+                            </ScrollPane>
+                            <Label fx:id="notesEmptyLabel" text="There are no notes yet." styleClass="notes-empty"/>
+                        </VBox>
+
+                        <VBox fx:id="noteEditorPane" visible="false" spacing="12" styleClass="note-editor">
+                            <HBox alignment="CENTER_LEFT" spacing="10" styleClass="note-editor-header">
+                                <Button onAction="#handleCloseNote" styleClass="icon-button, note-back-button">
+                                    <graphic><FontIcon iconLiteral="fas-arrow-left" iconSize="13" styleClass="toolbar-icon"/></graphic>
+                                    <tooltip><Tooltip text="Back to notes"/></tooltip>
+                                </Button>
+                                <TextField fx:id="noteTitleField" promptText="Untitled note" styleClass="note-title-field" HBox.hgrow="ALWAYS"/>
+                                <Label fx:id="noteFormatLabel" text=".txt" styleClass="note-format-badge"/>
+                                <ComboBox fx:id="noteTaskCombo" promptText="Link a task" prefWidth="230" styleClass="note-task-combo"/>
+                                <Button fx:id="noteOpenTaskButton" text="Open task" onAction="#handleOpenLinkedTask" styleClass="btn-secondary, note-open-task"/>
+                                <Button text="Delete" onAction="#handleDeleteNote" styleClass="btn-secondary, danger-button"/>
+                            </HBox>
+                            <HBox spacing="7" alignment="CENTER_LEFT" styleClass="note-typography-toolbar">
+                                <Label text="Typography" styleClass="note-toolbar-label"/>
+                                <ComboBox fx:id="noteFontFamilyCombo" promptText="Font" prefWidth="190" styleClass="note-font-control"/>
+                                <ComboBox fx:id="noteFontSizeCombo" promptText="Size" prefWidth="82" styleClass="note-font-control"/>
+                                <ComboBox fx:id="noteFontWeightCombo" promptText="Weight" prefWidth="112" styleClass="note-font-control"/>
+                                <ToggleButton fx:id="noteBoldToggle" text="B" styleClass="markdown-tool, markdown-tool-bold">
+                                    <tooltip><Tooltip text="Make the entire note bold"/></tooltip>
+                                </ToggleButton>
+                                <ToggleButton fx:id="noteItalicToggle" text="I" styleClass="markdown-tool, markdown-tool-italic">
+                                    <tooltip><Tooltip text="Italicize the entire note"/></tooltip>
+                                </ToggleButton>
+                                <Button text="Reset" onAction="#handleResetNoteTypography" styleClass="note-reset-typography"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Label text="Formatting applies to this note" styleClass="note-toolbar-hint"/>
+                            </HBox>
+                            <HBox fx:id="markdownToolbar" visible="false" managed="false" spacing="5" alignment="CENTER_LEFT" styleClass="markdown-toolbar">
+                                <Button text="H" onAction="#handleMarkdownHeading" styleClass="markdown-tool"><tooltip><Tooltip text="Heading"/></tooltip></Button>
+                                <Button text="B" onAction="#handleMarkdownBold" styleClass="markdown-tool, markdown-tool-bold"><tooltip><Tooltip text="Bold"/></tooltip></Button>
+                                <Button text="I" onAction="#handleMarkdownItalic" styleClass="markdown-tool, markdown-tool-italic"><tooltip><Tooltip text="Italic"/></tooltip></Button>
+                                <Button text="Link" onAction="#handleMarkdownLink" styleClass="markdown-tool"/>
+                                <Button text="Code" onAction="#handleMarkdownCode" styleClass="markdown-tool"/>
+                                <Button text="Checklist" onAction="#handleMarkdownChecklist" styleClass="markdown-tool, markdown-checklist-tool">
+                                    <graphic><FontIcon iconLiteral="far-square" iconSize="13" styleClass="markdown-tool-icon"/></graphic>
+                                    <tooltip><Tooltip text="Insert an unchecked Markdown task: - [ ]"/></tooltip>
+                                </Button>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <ToggleButton fx:id="notePreviewToggle" text="Preview" onAction="#handleToggleNotePreview" styleClass="btn-secondary, note-preview-toggle"/>
+                            </HBox>
+                            <HBox fx:id="notePreviewSettingsBar" visible="false" managed="false" spacing="7" alignment="CENTER_LEFT" styleClass="note-preview-settings">
+                                <Label text="Reading appearance" styleClass="note-toolbar-label"/>
+                                <ComboBox fx:id="notePreviewFontFamilyCombo" promptText="Preview font" prefWidth="190" styleClass="note-font-control"/>
+                                <ComboBox fx:id="notePreviewFontSizeCombo" promptText="Size" prefWidth="82" styleClass="note-font-control"/>
+                                <Label text="Text color" styleClass="note-toolbar-hint"/>
+                                <ColorPicker fx:id="notePreviewColorPicker" prefWidth="54" styleClass="note-color-picker"/>
+                                <Button text="Reset reading style" onAction="#handleResetPreviewTypography" styleClass="note-reset-typography"/>
+                                <Region HBox.hgrow="ALWAYS"/>
+                                <Label text="Applied only to Preview" styleClass="note-toolbar-hint"/>
+                            </HBox>
+                            <StackPane VBox.vgrow="ALWAYS" styleClass="note-editor-body">
+                                <CodeArea fx:id="noteContentArea" wrapText="true" styleClass="note-code-area"/>
+                                <ScrollPane fx:id="notePreviewScroll" visible="false" managed="false" fitToWidth="true" hbarPolicy="NEVER" styleClass="note-preview-scroll">
+                                    <VBox fx:id="notePreviewContent" spacing="8" styleClass="note-preview-content"/>
+                                </ScrollPane>
+                            </StackPane>
+                            <Label fx:id="noteEditorStatus" text="Saved automatically" styleClass="save-status"/>
+                        </VBox>
+                    </StackPane>
                 </VBox>
 
                 <VBox fx:id="genericView" visible="false" alignment="CENTER" spacing="16" styleClass="generic-view">

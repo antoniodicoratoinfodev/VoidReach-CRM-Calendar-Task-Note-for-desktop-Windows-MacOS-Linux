@@ -1,142 +1,372 @@
-# VoidReach
+# VoidReach CRM
 
-VoidReach is a desktop CRM application developed with Java 26 and JavaFX 26.0.1. It currently provides local contact, calendar, and task management, account authentication, and persistent data storage on the user's computer.
+VoidReach is a local-first desktop CRM workspace built with Java 26 and JavaFX 26. It brings account management, contacts, calendar planning, task control, dashboards, and linked TXT/Markdown notes into one native application.
 
-> Current status: the **Contacts** and **Calendar** sections are operational. The other navigation items are present in the interface but still display an “under development” placeholder.
+All workspace data is stored locally and separated by account. The application does not require a remote server, database installation, or JavaFX SDK installation.
 
-## Available Features
+## Current Status
 
-### Account and Authentication
+The following sections are operational:
 
-- Registration with name, email address, and a password of at least 8 characters.
-- Login and logout.
-- Password recovery through a six-digit code that remains valid for 15 minutes. In this local version, the code is displayed directly in the application; no email is sent.
-- Password changes and name updates from the account menu.
-- **Stay signed in on this device** option: only the account email is stored, never the password.
-- Passwords and password-recovery codes are stored as PBKDF2-derived values with a salt.
+- Home
+- Dashboard
+- Contacts
+- Calendar
+- Tasks
+- Notes
+- Account and profile management
+- Per-account themes
+- Local persistence and automatic backups
+
+The Settings navigation item and the Help/Notifications top-bar controls are currently placeholders.
+
+## Feature Overview
+
+### Accounts and Authentication
+
+- Create an account with a full name, email address, and password.
+- Email addresses are normalized before storage and must use a valid format.
+- Passwords must contain at least eight characters.
+- Sign in and sign out locally.
+- Optionally remember the account email on the current device; passwords are never stored in the remembered-session file.
+- Recover a password with a six-digit code valid for 15 minutes.
+- In this local build, the recovery code is shown in the application instead of being sent by email.
+- Update the account name from the profile dialog.
+- Change the password after confirming the current password.
+- Each account keeps its own CRM workspace, avatar, theme, notes, and preferences.
+
+Passwords and recovery codes are protected with salted PBKDF2-HMAC-SHA256 derivation using 120,000 iterations.
+
+### Home
+
+The Home section provides a daily operational summary:
+
+- Personalized greeting and current date.
+- Total number of contacts.
+- Number of tasks scheduled today.
+- Number of tasks scheduled during the next seven days.
+- Next scheduled task and its time.
+- Today's agenda.
+- Upcoming tasks.
+- Recently available address-book contacts.
+- Quick actions for creating a contact and opening the calendar.
+
+### Dashboard
+
+The Dashboard provides read-only analytics generated from the active workspace:
+
+- Total contacts.
+- Total calendar tasks.
+- Upcoming tasks during the next seven days.
+- Total planned time.
+- Contact distribution by tag.
+- Upcoming workload chart grouped by day.
+- Recorded contact interactions.
+
+Dashboard values update whenever contacts or tasks change.
 
 ### Contacts
 
-- Table showing name, company, job title, email, phone, last interaction, and tags.
-- Contact creation and editing through a dialog.
-- Available fields: name, company, job title, email, phone, tag, and description.
-- Available tags: `Client`, `Tech`, and `Follow-up`.
-- Real-time search by name, company, email, and description.
-- Pagination with 15, 25, 50, or 100 contacts, or all contacts.
-- Single or multiple selection and deletion with confirmation.
-- Double-click a row to edit a contact.
-- Copy selected contacts to the clipboard with `Ctrl+C` on Windows/Linux or `Cmd+C` on macOS.
+- Create, view, edit, and delete contacts.
+- Open a contact by clicking its table row.
+- Store name, company, job title, email, phone, last interaction, tag, and description.
+- Built-in tags: `Client`, `Tech`, and `Follow-up`.
+- Search in real time by contact information and description.
+- Sort any visible field in ascending or descending order.
+- Clear the active sorting rule.
+- Paginate results using 15, 25, 50, or 100 rows, or display all contacts.
+- Enable selection mode for single or bulk deletion.
+- Copy selected contacts to the clipboard with `Ctrl+C` or `Cmd+C`.
+- Resize and reorder table columns with the mouse.
+- Rename a column by clicking directly on its label; dragging the surrounding header continues to reorder the column.
 
-### Calendar and Task Management
+### Calendar
 
-- **Day** and **Week** views on a 24-hour grid with 15-minute intervals.
-- Create a task by clicking on the timeline.
-- Edit tasks with a double-click or right-click.
-- Reschedule tasks with drag and drop.
-- Resize a task by dragging its bottom edge.
-- Edit the date, start time, end time, description, and color.
-- Tasks must last at least 5 minutes and remain within the same day.
-- Available colors: `Blue`, `Red`, `Green`, `Yellow`, `Orange`, and `Purple`.
-- Navigate to the previous or next day and return to today.
-- Timeline zoom from 0.75x to 3x with `Ctrl`/`Cmd` + mouse wheel; `Ctrl+0`/`Cmd+0` resets the zoom.
+- Day and Week views over a 24-hour timeline.
+- Fifteen-minute visual intervals.
+- Create a task from the calendar timeline.
+- Open the task editor with a double-click or right-click.
+- Edit title, date, start time, end time, color, and description.
+- Move tasks vertically to change their time.
+- Move tasks horizontally between days in Week view.
+- Resize a task from its lower edge.
+- Delete a selected task with the keyboard or from the task dialog.
+- Marked-complete tasks are visually distinguished.
+- Available colors: Blue, Red, Green, Yellow, Orange, and Purple.
+- Tasks must last at least five minutes and cannot end after 24:00.
+- Navigate to the previous or next day/week and return to today.
+- Zoom the timeline from 0.75x to 3x.
+- `Ctrl`/`Cmd` + mouse wheel zooms while the pointer is over the calendar; clicking the scrollbar first is not required.
+- `Ctrl+0`/`Cmd+0` restores 100% zoom while the pointer is over the calendar.
+- Selected date, Day/Week mode, and zoom level are restored from the saved workspace.
 
-### Sidebar and Theme
+Tasks linked to notes display a compact note menu directly on calendar entries, in the agenda, and in the task-edit dialog.
 
-- Monthly mini-calendar with month navigation.
-- Selected day and current day highlighting.
-- List of tasks for the selected day; clicking a task opens the Calendar view.
-- Dark and light themes selectable from the sidebar.
-- Profile avatar support for PNG and JPG images, with preview, circular cropping, and zoom.
+### Tasks
 
-### Sections Not Yet Implemented
+The Tasks section is a dedicated control center for every task stored in the calendar:
 
-The **Home**, **Dashboard**, **Leads**, **Opportunities**, **Accounts**, **Tasks**, and **Settings** items are navigable but currently display a placeholder. **Tasks** is not a standalone section: task management is integrated into the **Calendar**.
+- View all calendar tasks in chronological order.
+- Metrics for total, due today, next seven days, and completed tasks.
+- Search by title or description.
+- Filter by All tasks, Today, Upcoming, Overdue, or Completed.
+- Mark a task completed or open again.
+- Click a task row to open the same editor used by Calendar.
+- Open the corresponding calendar date.
+- Delete a task with confirmation.
+- Open any note linked to the task.
+- Multiple linked notes are available through a compact menu.
 
+Calendar and Tasks always operate on the same task data; changes made in one section immediately appear in the other.
 
-## Local Persistence and Security
+### Notes
 
-Data is stored in the `.voidreach-crm` directory inside the user's home directory:
+The Notes section provides a per-account knowledge workspace.
+
+#### Note Library
+
+- Create any number of notes.
+- Choose Plain text (`.txt`) or Markdown (`.md`) when creating a note.
+- Search by title or content.
+- Reorder note cards with drag and drop.
+- The chosen order is persisted.
+- Click a card to open a full-workspace editor.
+- Rename notes from the title field.
+- Delete notes with confirmation.
+- Changes are saved automatically.
+
+TXT and Markdown are stored as note formats inside the local VoidReach workspace. They are not currently exported as standalone filesystem files.
+
+#### Typography
+
+Both TXT and Markdown notes support per-note presentation settings:
+
+- Any font family installed on the system.
+- Font sizes from 12 to 48 px.
+- Regular, Medium, Semibold, and Bold weights.
+- Quick whole-note Bold control.
+- Whole-note italic style.
+- Reset to the default typography.
+
+The settings are saved with the note and restored the next time it is opened.
+
+#### Markdown Editing
+
+Markdown notes use a RichTextFX `CodeArea`, so the text, syntax colors, selection, and blinking insertion cursor are rendered by one native editor control.
+
+- Heading, bold, italic, link, code, and checklist toolbar actions.
+- `Ctrl+B`/`Cmd+B` wraps the selection in Markdown bold syntax.
+- `Ctrl+I`/`Cmd+I` wraps the selection in Markdown italic syntax.
+- Tab inserts four spaces for code indentation.
+- Inline code uses single backticks.
+- Selecting multiple lines and pressing Code creates a fenced code block with triple backticks.
+- Older notes containing multiline code between single backticks are recognized for compatibility.
+- Obsidian-style wiki links such as `[[Project plan]]` open the matching note from Preview.
+- Standard Markdown links are rendered distinctly; clicking one copies its target address to the clipboard.
+
+#### Live Code Highlighting
+
+Code inside backticks or fenced blocks is highlighted while editing and in Preview. The lightweight multilingual lexer distinguishes common:
+
+- Keywords
+- Data types and class names
+- Variables
+- Functions
+- Strings
+- Numbers
+- Comments
+- Annotations
+- Operators
+
+The highlighter is language-agnostic and designed for common Java, JavaScript, Python, SQL, and similar syntax. It does not replace a compiler or a full language server.
+
+#### Markdown Preview
+
+- Separate reading mode with rendered Markdown structure.
+- Headings, paragraphs, lists, checklists, quotes, separators, bold, italic, strikethrough, inline code, and fenced code blocks.
+- Syntax-highlighted code.
+- Clickable Obsidian-style note links.
+- Independent Preview font family.
+- Independent Preview font size from 12 to 48 px.
+- Custom Preview text color.
+- Reset reading appearance to the active-theme defaults.
+- Preview settings are saved separately for every note.
+
+#### Linking Notes and Tasks
+
+- A note can be linked to a calendar task from the note editor.
+- A note can also be attached from the task dialog.
+- A task may have multiple linked notes.
+- Open the linked task directly from its note.
+- Open linked notes from Tasks, Calendar entries, the calendar agenda, or the task dialog.
+- Deleting a task safely unlinks its notes without deleting the notes themselves.
+
+### Agenda Sidebar
+
+- Toggle the agenda panel from the top toolbar.
+- Monthly mini-calendar with previous/next month navigation.
+- Highlights the selected date and the current day.
+- Displays tasks for the selected day or week.
+- Click an agenda item to open its task.
+- Open notes linked to agenda tasks.
+
+### Themes
+
+Three themes are available:
+
+- Dark
+- Light
+- Blue-gray
+
+The last selected theme is stored per account and restored when that account opens the application again. Themes are applied consistently to the main interface, dialogs, calendar, notes editor, Markdown Preview, and syntax highlighting.
+
+### Profile Picture
+
+- Select PNG, JPG, or JPEG images.
+- Maximum upload size: 10 MB.
+- Supported dimensions range from 300×300 to 20,000×20,000 pixels.
+- Interactive circular crop with drag and zoom controls.
+- The optimized master image is stored as PNG at up to 1024×1024 pixels.
+- Display renditions account for HiDPI output scaling.
+- The remembered account avatar is preloaded during startup.
+- One master and up to two disposable display renditions are retained.
+
+## Keyboard and Mouse Reference
+
+| Context | Action |
+|---|---|
+| Contacts | Click a row to edit |
+| Contacts | Click a column label to rename it |
+| Contacts | Drag a column header to reorder it |
+| Contacts | `Ctrl+C` / `Cmd+C` copies selected contacts |
+| Calendar | Double-click or right-click a task to edit |
+| Calendar | Drag a task to reschedule it |
+| Calendar | Drag the lower edge to change duration |
+| Calendar | `Ctrl` / `Cmd` + mouse wheel changes zoom |
+| Calendar | `Ctrl+0` / `Cmd+0` resets zoom |
+| Tasks | Click a task row to edit it |
+| Notes | Drag a note card to reorder it |
+| Markdown | `Ctrl+B` / `Cmd+B` inserts bold syntax |
+| Markdown | `Ctrl+I` / `Cmd+I` inserts italic syntax |
+| Markdown | Tab inserts four spaces |
+
+## Local Persistence and Recovery
+
+VoidReach stores application data under `.voidreach-crm` in the current user's home directory:
 
 ```text
 ~/.voidreach-crm/
-├── users.properties                         # accounts and derived credentials
-├── users.properties.bak                     # previous revision, when available
-├── session.properties                      # remembered-session email
-├── data/<account-id>.properties             # contacts, tasks, and calendar preferences
-├── data/<account-id>.properties.bak         # atomic backup of the data file
-├── avatars/<account-id>-<uuid>.png          # cropped avatar saved as PNG
-├── avatars/<account-id>-<uuid>.png.<size>.rendition.png # up to 2 disposable display caches
-└── backup/<account-id>/                     # automatic CRM data backups
-    └── crm-data-<timestamp>.properties      # up to 3 copies are retained
+├── users.properties                         # accounts, credentials, avatar name, preferred theme
+├── users.properties.bak                     # previous atomic revision when available
+├── session.properties                       # remembered account email only
+├── data/
+│   ├── <account-id>.properties              # contacts, tasks, notes, ordering, links, calendar settings
+│   └── <account-id>.properties.bak          # previous atomic workspace revision
+├── avatars/
+│   ├── <account-id>-<uuid>.png              # authoritative cropped master
+│   └── <account-id>-<uuid>.png.<size>.rendition.png
+└── backup/<account-id>/
+    └── crm-data-<timestamp>.properties      # rotating automatic workspace snapshots
 ```
 
-Primary saves are atomic. If a file is corrupted, the application attempts to recover the previous `.bak` revision. Unreadable records are isolated in files with the `.corrupt.properties` suffix so that the remaining valid data can still be loaded when possible.
+- Workspace saves are debounced and performed away from the JavaFX UI thread.
+- The latest state is flushed before signing out.
+- Primary files are written atomically.
+- The application attempts recovery from `.bak` when the primary revision cannot be read.
+- Corrupt records are isolated in `.corrupt.properties` files so valid records can still load when possible.
+- Automatic snapshots run every two minutes while an account workspace is open.
+- Up to three automatic snapshots are retained per account.
 
-Avatars support PNG and JPG/JPEG images ranging from 300×300 to 20,000×20,000 pixels, with a maximum file size of 10 MB. Images are processed with bounded memory usage and saved as a PNG master image of up to 1024×1024 pixels.
-The startup splash preloads the remembered account's navbar avatar. Each avatar keeps one authoritative master and no more than two lossless display renditions, for a maximum of three stored image files.
+Workspace files and automatic backups are local files and are not encrypted. Protect the operating-system account and its home directory accordingly.
 
 ## Requirements
 
-- JDK 26 (the project is currently verified with JDK 26.0.1)
-- Apache Maven 3.9 or newer
-- An operating system with JavaFX support (macOS, Windows, or Linux)
+- JDK 26; the project is currently configured for Java 26.
+- Apache Maven 3.9 or newer.
+- macOS, Windows, or Linux with JavaFX support.
 
-JavaFX 26.0.1 is resolved by Maven; a separate JavaFX SDK installation is not required. Java 26 is a non-LTS release, so the runtime should be reassessed when Java 27 becomes available.
+Maven resolves JavaFX 26.0.1, RichTextFX 0.11.7, Ikonli, and image-processing dependencies. A separate JavaFX SDK installation is not required.
 
-Confirm that Maven is using JDK 26 before building:
+Confirm that Maven uses the correct JDK:
 
 ```bash
 java -version
 mvn -version
 ```
 
-If Maven selects a different JDK, set `JAVA_HOME` to the JDK 26 installation before running the commands below.
+If Maven selects a different JDK, update `JAVA_HOME` before building or running VoidReach.
 
 ## Running the Application
 
-From the Maven module directory:
+From the Maven module:
 
 ```bash
 cd VoidReach-CRM-Final-No-FatJar
 mvn clean javafx:run
 ```
 
-Alternatively, on macOS/Linux:
+On macOS or Linux, the helper script runs the same Maven goal:
 
 ```bash
 cd VoidReach-CRM-Final-No-FatJar
 ./run.sh
 ```
 
-The project can also be imported into IntelliJ IDEA as a Maven project by selecting the `pom.xml` file inside the `VoidReach-CRM-Final-No-FatJar` module.
+For IntelliJ IDEA, import `VoidReach-CRM-Final-No-FatJar/pom.xml` as a Maven project and run `com.crm.app.AppLauncher`.
 
-## Native packages
+## Tests
 
-The application icon is kept as a transparent 512×512 PNG for JavaFX. Native packages use platform-specific, multi-resolution files: `src/main/packaging/macos/VoidReach.icns` (macOS) and `src/main/packaging/windows/VoidReach.ico` (Windows).
+Run the complete unit-test suite:
 
-Create a native app image on its target operating system:
+```bash
+cd VoidReach-CRM-Final-No-FatJar
+mvn clean test
+```
+
+Run the bounded-memory large-avatar integration test:
+
+```bash
+mvn verify -Pavatar-large-image
+```
+
+The tests cover contact and overview behavior, task and note models, Markdown code tokenization, themes, account/workspace persistence, corruption recovery, atomic saves, rotating backups, asynchronous workspace saves, and avatar processing.
+
+## Native Packaging
+
+Native application images must be created on their target operating system.
+
+### macOS
 
 ```bash
 cd VoidReach-CRM-Final-No-FatJar
 ./scripts/package-macos.sh
 ```
 
-On Windows, run `scripts/package-windows.ps1` from PowerShell. Both scripts write only under `target/packages/`; run the test suite separately before publishing a package.
+### Windows
 
-## Tests
+Run the following script from PowerShell:
 
-To run the unit tests:
-
-```bash
+```powershell
 cd VoidReach-CRM-Final-No-FatJar
-mvn test
+./scripts/package-windows.ps1
 ```
 
-The large-image integration test runs through the `avatar-large-image` profile:
+Packages are written under `target/packages/`. Packaging scripts do not run the test suite automatically, so run `mvn clean test` before distributing a build.
 
-```bash
-mvn verify -Pavatar-large-image
-```
+Platform icons are located at:
+
+- `src/main/packaging/macos/VoidReach.icns`
+- `src/main/packaging/windows/VoidReach.ico`
+
+## Technology
+
+- Java 26
+- JavaFX 26.0.1
+- RichTextFX 0.11.7
+- Ikonli FontAwesome 5
+- TwelveMonkeys ImageIO
+- Maven
+- JUnit 5
 
 ## Project Structure
 
@@ -145,67 +375,26 @@ VoidReach-CRM-Calendar-Task/
 ├── README.md
 ├── LICENSE
 ├── sample/
-│   ├── voidreachmac.png
-│   └── voidreachwindows.png
-├── agenda_icon_preview.png
 └── VoidReach-CRM-Final-No-FatJar/
     ├── pom.xml
     ├── run.sh
     ├── scripts/
-    │   ├── package-macos.sh                         # macOS app-image with VoidReach.icns
-    │   └── package-windows.ps1                      # Windows app-image with VoidReach.ico
+    │   ├── package-macos.sh
+    │   └── package-windows.ps1
     └── src/
         ├── main/
         │   ├── java/com/crm/
-        │   │   ├── app/
-        │   │   │   ├── AppLauncher.java            # Application launcher and configuration
-        │   │   │   └── Main.java                   # JavaFX entry point and transitions
-        │   │   ├── controller/
-        │   │   │   ├── AccountController.java       # Account, password, logout, and avatar UI
-        │   │   │   ├── CalendarController.java      # Calendar, tasks, timeline, and zoom
-        │   │   │   ├── ContactsController.java      # Contact table, dialogs, search, and pagination
-        │   │   │   ├── LoginController.java         # Login, registration, and recovery
-        │   │   │   ├── MainController.java          # Main-view composition and shared workspace state
-        │   │   │   ├── NavigationController.java    # Sidebar navigation and view switching
-        │   │   │   └── SplashScreenController.java  # Splash screen
-        │   │   ├── model/
-        │   │   │   ├── Contact.java                 # Contact model
-        │   │   │   ├── CrmDataSnapshot.java         # Account data snapshot
-        │   │   │   ├── Task.java                    # Activity model
-        │   │   │   └── UserAccount.java             # Account model
-        │   │   ├── repository/
-        │   │   │   ├── AtomicPropertiesStore.java  # Atomic saves and .bak files
-        │   │   │   ├── CorruptRecordQuarantine.java # Corrupt-record isolation
-        │   │   │   ├── CrmBackupService.java        # Rotating automatic backups
-        │   │   │   ├── CrmDataRepository.java       # CRM data contract
-        │   │   │   ├── LocalCrmDataRepository.java  # Local CRM persistence
-        │   │   │   ├── LocalUserRepository.java     # Local account persistence
-        │   │   │   └── UserRepository.java          # Account persistence contract
-        │   │   └── service/
-        │   │       ├── AuthService.java             # Registration and authentication
-        │   │       ├── AvatarImageProcessor.java    # Avatar validation, cropping, and resizing
-        │   │       ├── AvatarService.java            # Avatar storage and loading
-        │   │       ├── CrmWorkspaceService.java      # CRM persistence and backup lifecycle
-        │   │       ├── DialogService.java            # Themed application alerts
-        │   │       ├── SessionService.java           # Remembered session
-        │   │       └── ThemeService.java             # Scene and dialog theme management
-        │   ├── packaging/
-        │   │   ├── macos/VoidReach.icns              # Native macOS icon (16–512 px)
-        │   │   └── windows/VoidReach.ico             # Native Windows icon (16–256 px)
+        │   │   ├── app/                    # launcher and JavaFX application lifecycle
+        │   │   ├── controller/             # account, overview, contacts, calendar, tasks, notes, navigation
+        │   │   ├── model/                  # contacts, tasks, notes, accounts, workspace snapshots
+        │   │   ├── repository/             # atomic local storage, recovery, quarantine, backups
+        │   │   └── service/                # authentication, sessions, themes, avatars, Markdown code lexer
+        │   ├── packaging/                  # native platform icons
         │   └── resources/
-        │       ├── com/crm/view/
-        │       │   ├── LoginView.fxml                # Authentication views
-        │       │   ├── MainView.fxml                 # Main layout
-        │       │   └── SplashScreen.fxml             # Splash-screen layout
-        │       ├── css/
-        │       │   ├── style.css                     # Light theme
-        │       │   └── style-dark.css                # Dark theme
-        │       └── images/
-        │           └── app-icon.png                  # Application icon
-        └── test/java/com/crm/
-            ├── model/                                # Task model tests
-            ├── repository/                           # Persistence and backup tests
-            └── service/                              # Avatar and image-processing tests
+        │       ├── com/crm/view/           # FXML layouts
+        │       ├── css/                    # Light, Dark, and Blue-gray themes
+        │       └── images/                 # application graphics
+        └── test/java/com/crm/              # unit and integration tests
 ```
 
 ## Screenshots

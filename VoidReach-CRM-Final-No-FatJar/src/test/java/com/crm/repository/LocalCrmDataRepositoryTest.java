@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.crm.model.Contact;
 import com.crm.model.CrmDataSnapshot;
+import com.crm.model.Note;
+import com.crm.model.NoteFormat;
 import com.crm.model.Task;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -62,6 +64,36 @@ class LocalCrmDataRepositoryTest {
         Path quarantine = directory.resolve("account-1.properties.corrupt.properties");
         assertTrue(Files.isRegularFile(quarantine));
         assertEquals("5", load(quarantine).getProperty("records.count"));
+    }
+
+    @Test void preservesNoteOrderFormatsMarkdownAndTaskLinks() {
+        LocalCrmDataRepository repository = new LocalCrmDataRepository(directory);
+        LocalDate date = LocalDate.of(2026, 7, 12);
+        Task task = new Task("task-linked", "Ship release", "", 600, 45, "Blue");
+        Note markdown = new Note("note-md", "Release plan", "# Plan\n\n- [ ] Ship\n[[Research]] ✨",
+                NoteFormat.MARKDOWN, task.getId(), "Georgia", 22, 700, true,
+                "Arial", 26, "#224466");
+        Note text = new Note("note-txt", "Research", "Plain text\nwith multiple lines",
+                NoteFormat.TEXT, "");
+
+        repository.saveForUser("notes-account", new CrmDataSnapshot(
+                List.of(), Map.of(date, List.of(task)), List.of(markdown, text), date, "Day", 1.0));
+
+        CrmDataSnapshot loaded = repository.loadForUser("notes-account");
+
+        assertEquals(List.of("note-md", "note-txt"), loaded.notes().stream().map(Note::getId).toList());
+        assertEquals(NoteFormat.MARKDOWN, loaded.notes().getFirst().getFormat());
+        assertEquals("# Plan\n\n- [ ] Ship\n[[Research]] ✨", loaded.notes().getFirst().getContent());
+        assertEquals("task-linked", loaded.notes().getFirst().getLinkedTaskId());
+        assertEquals("Georgia", loaded.notes().getFirst().getFontFamily());
+        assertEquals(22, loaded.notes().getFirst().getFontSize());
+        assertEquals(700, loaded.notes().getFirst().getFontWeight());
+        assertTrue(loaded.notes().getFirst().isItalic());
+        assertEquals("Arial", loaded.notes().getFirst().getPreviewFontFamily());
+        assertEquals(26, loaded.notes().getFirst().getPreviewFontSize());
+        assertEquals("#224466", loaded.notes().getFirst().getPreviewTextColor());
+        assertEquals(NoteFormat.TEXT, loaded.notes().get(1).getFormat());
+        assertEquals(Note.DEFAULT_FONT_SIZE, loaded.notes().get(1).getFontSize());
     }
 
     private static Properties load(Path file) throws Exception {

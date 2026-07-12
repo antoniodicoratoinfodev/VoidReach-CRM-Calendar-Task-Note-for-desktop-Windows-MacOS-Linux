@@ -1,17 +1,22 @@
 package com.crm.controller;
 
 import com.crm.model.Task;
+import com.crm.model.Note;
 import com.crm.service.ThemeService;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextField;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -167,7 +172,20 @@ public final class TasksController {
         Button delete = new Button("Delete");
         delete.getStyleClass().addAll("task-row-button", "task-delete-button");
         delete.setOnAction(event -> confirmDelete(entry));
-        HBox controls = new HBox(6, calendar, edit, delete);
+        HBox controls = new HBox(6);
+        List<Note> linkedNotes = actions.linkedNotes(task.getId());
+        if (!linkedNotes.isEmpty()) {
+            MenuButton note = new MenuButton(linkedNotes.size() == 1 ? "Note" : linkedNotes.size() + " notes");
+            note.getStyleClass().addAll("task-row-button", "task-note-link");
+            linkedNotes.forEach(linked -> {
+                MenuItem item = new MenuItem(linked.getTitle().isBlank() ? "Untitled note" : linked.getTitle());
+                item.setOnAction(event -> actions.openNote(linked.getId()));
+                note.getItems().add(item);
+            });
+            note.setTooltip(new Tooltip("Open a linked note"));
+            controls.getChildren().add(note);
+        }
+        controls.getChildren().addAll(calendar, edit, delete);
         controls.setAlignment(Pos.CENTER_RIGHT);
 
         row.getChildren().addAll(completed, marker, details, schedule, status, controls);
@@ -181,7 +199,7 @@ public final class TasksController {
     private boolean isInteractiveChild(Object target, HBox row) {
         if (!(target instanceof Node node)) return false;
         for (Node current = node; current != null && current != row; current = current.getParent()) {
-            if (current instanceof Button || current instanceof CheckBox) return true;
+            if (current instanceof ButtonBase || current instanceof CheckBox) return true;
         }
         return false;
     }
@@ -241,5 +259,7 @@ public final class TasksController {
         void delete(LocalDate date, Task task);
         void setCompleted(LocalDate date, Task task, boolean completed);
         void openCalendar(LocalDate date);
+        List<Note> linkedNotes(String taskId);
+        void openNote(String noteId);
     }
 }

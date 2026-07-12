@@ -842,3 +842,92 @@
 .tasks-empty { -fx-padding: 32; -fx-alignment: CENTER; -fx-max-width: infinity; -fx-text-fill: #94a3b8; }
 .task-entry-completed { -fx-opacity: 0.58; }
 .task-entry-completed .task-title { -fx-strikethrough: true; }
+
+/* Notes workspace */
+.notes-view, .notes-library, .note-editor { -fx-background-color: #f5f7fb; }
+.notes-scroll, .notes-scroll > .viewport { -fx-background-color: transparent; -fx-background: transparent; }
+.notes-grid { -fx-padding: 2 2 18 2; }
+.notes-empty { -fx-max-width: infinity; -fx-alignment: CENTER; -fx-padding: 34; -fx-text-fill: #94a3b8; }
+.note-card {
+    -fx-min-height: 174; -fx-padding: 16;
+    -fx-background-color: white; -fx-background-radius: 12;
+    -fx-border-color: #e2e8f0; -fx-border-radius: 12;
+    -fx-effect: dropshadow(gaussian, rgba(15,23,42,0.06), 12, 0.08, 0, 3);
+    -fx-cursor: hand;
+}
+.note-card:hover { -fx-border-color: #93c5fd; -fx-effect: dropshadow(gaussian, rgba(37,99,235,0.13), 17, 0.1, 0, 5); }
+.note-card-dragging { -fx-opacity: 0.55; }
+.note-card-icon { -fx-icon-color: #2563eb; }
+.note-drag-handle { -fx-icon-color: #94a3b8; -fx-cursor: move; }
+.note-card-format, .note-format-badge {
+    -fx-background-color: #eff6ff; -fx-background-radius: 10;
+    -fx-text-fill: #2563eb; -fx-font-size: 9px; -fx-font-weight: 800; -fx-padding: 4 7;
+}
+.note-card-title { -fx-text-fill: #0f172a; -fx-font-size: 15px; -fx-font-weight: 800; }
+.note-card-excerpt { -fx-text-fill: #64748b; -fx-font-size: 11px; }
+.note-card-link { -fx-text-fill: #2563eb; -fx-font-size: 10px; -fx-font-weight: 700; }
+.note-editor { -fx-padding: 18 24 16 24; }
+.note-editor-header { -fx-min-height: 48; }
+.note-title-field {
+    -fx-background-color: transparent; -fx-border-color: transparent;
+    -fx-font-size: 22px; -fx-font-weight: 800; -fx-text-fill: #0f172a; -fx-padding: 4 8;
+}
+.note-title-field:focused { -fx-background-color: white; -fx-border-color: #bfdbfe; -fx-background-radius: 8; -fx-border-radius: 8; }
+.note-typography-toolbar, .markdown-toolbar, .note-preview-settings { -fx-padding: 8 10; -fx-background-color: white; -fx-background-radius: 10; -fx-border-color: #e2e8f0; -fx-border-radius: 10; }
+.note-toolbar-label { -fx-text-fill: #334155; -fx-font-size: 10px; -fx-font-weight: 800; -fx-padding: 0 5 0 1; }
+.note-toolbar-hint { -fx-text-fill: #94a3b8; -fx-font-size: 9px; }
+.note-font-control { -fx-min-height: 30; -fx-pref-height: 30; -fx-font-size: 11px; }
+.note-color-picker { -fx-min-height: 30; -fx-pref-height: 30; -fx-color-label-visible: false; }
+.note-reset-typography { -fx-background-color: transparent; -fx-text-fill: #64748b; -fx-font-size: 10px; -fx-font-weight: 700; -fx-cursor: hand; }
+.note-reset-typography:hover { -fx-text-fill: #2563eb; -fx-background-color: #eff6ff; -fx-background-radius: 7; }
+.markdown-toolbar { -fx-padding: 7 9; -fx-background-color: white; -fx-background-radius: 10; -fx-border-color: #e2e8f0; -fx-border-radius: 10; }
+.markdown-tool { -fx-min-width: 32; -fx-min-height: 30; -fx-background-color: transparent; -fx-text-fill: #475569; -fx-font-weight: 700; -fx-cursor: hand; }
+.markdown-tool:hover { -fx-background-color: #f1f5f9; -fx-background-radius: 7; }
+.markdown-tool:selected, .note-preview-toggle:selected { -fx-background-color: #dbeafe; -fx-text-fill: #1d4ed8; -fx-background-radius: 7; }
+.markdown-tool-bold { -fx-font-weight: 900; }
+.markdown-tool-italic { -fx-font-style: italic; }
+.markdown-checklist-tool { -fx-padding: 0 9; }
+.markdown-tool-icon { -fx-icon-color: #475569; }
+.markdown-tool:hover .markdown-tool-icon { -fx-icon-color: #2563eb; }
+.note-editor-body { -fx-background-color: white; -fx-background-radius: 12; -fx-border-color: #e2e8f0; -fx-border-radius: 12; }
+.note-code-area { -fx-background-color: white; -fx-padding: 20 22; }
+.note-code-area .paragraph-box { -fx-background-color: white; }
+.note-code-area .text { -fx-fill: #334155; }
+.note-code-area .caret { -fx-stroke: #0f172a; -fx-stroke-width: 1.6; }
+.note-code-area .selection { -fx-fill: rgba(37,99,235,0.25); }
+.note-code-area .paragraph-box:has-caret { -fx-background-color: #f8fafc; }
+.markdown-source-text, .note-code-area .markdown-source-text { -fx-fill: #334155; }
+.syntax-delimiter, .note-code-area .syntax-delimiter { -fx-fill: #64748b; }
+.syntax-plain, .syntax-operator, .note-code-area .syntax-plain, .note-code-area .syntax-operator { -fx-fill: #334155; }
+.syntax-keyword, .note-code-area .syntax-keyword { -fx-fill: #7c3aed; }
+.syntax-type, .note-code-area .syntax-type { -fx-fill: #047857; }
+.syntax-variable, .note-code-area .syntax-variable { -fx-fill: #0369a1; }
+.syntax-function, .note-code-area .syntax-function { -fx-fill: #92400e; }
+.syntax-string, .note-code-area .syntax-string { -fx-fill: #b45309; }
+.syntax-number, .note-code-area .syntax-number { -fx-fill: #15803d; }
+.syntax-comment, .note-code-area .syntax-comment { -fx-fill: #6b7280; -fx-font-style: italic; }
+.syntax-annotation, .note-code-area .syntax-annotation { -fx-fill: #a16207; }
+.note-preview-scroll, .note-preview-scroll > .viewport { -fx-background-color: white; -fx-background: white; -fx-background-radius: 11; }
+.note-preview-content { -fx-padding: 42 64; -fx-spacing: 12; }
+.markdown-paragraph, .markdown-list-item { -fx-padding: 2 0; }
+.markdown-paragraph .text, .markdown-list-item .text { -fx-fill: #334155; }
+.markdown-h1 { -fx-padding: 13 0 5 0; }
+.markdown-h2 { -fx-padding: 11 0 4 0; -fx-border-color: transparent transparent #e2e8f0 transparent; -fx-border-width: 0 0 1 0; }
+.markdown-h3 { -fx-padding: 8 0 3 0; }
+.markdown-h1 .text { -fx-fill: #0f172a; -fx-font-weight: 800; }
+.markdown-h2 .text { -fx-fill: #0f172a; -fx-font-weight: 800; }
+.markdown-h3 .text { -fx-fill: #1e293b; -fx-font-weight: 800; }
+.markdown-quote { -fx-padding: 6 12; -fx-border-color: #60a5fa; -fx-border-width: 0 0 0 3; }
+.markdown-quote .text { -fx-fill: #64748b; -fx-font-style: italic; }
+.markdown-code-block { -fx-padding: 13; -fx-background-color: #f1f5f9; -fx-background-radius: 8; }
+.markdown-code-line { -fx-font-family: "Monospaced"; -fx-font-size: 12px; }
+.markdown-inline-code { -fx-background-color: #e2e8f0; -fx-background-radius: 5; -fx-text-fill: #be123c; -fx-padding: 1 5; }
+.markdown-wiki-link, .markdown-external-link { -fx-text-fill: #2563eb; -fx-padding: 0; -fx-underline: false; }
+.markdown-wiki-link:hover, .markdown-external-link:hover { -fx-underline: true; }
+.markdown-strikethrough { -fx-fill: #94a3b8; }
+.markdown-check { -fx-text-fill: #334155; }
+.calendar-note-link, .activity-note-link, .dialog-note-link, .task-note-link {
+    -fx-background-color: transparent; -fx-text-fill: #2563eb; -fx-font-size: 9px;
+    -fx-font-weight: 700; -fx-padding: 2 5; -fx-cursor: hand;
+}
+.calendar-note-link:hover, .activity-note-link:hover, .dialog-note-link:hover, .task-note-link:hover { -fx-background-color: #dbeafe; -fx-background-radius: 6; }

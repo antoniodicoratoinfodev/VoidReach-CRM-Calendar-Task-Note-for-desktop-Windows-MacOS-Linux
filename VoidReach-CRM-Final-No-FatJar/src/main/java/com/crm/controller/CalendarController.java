@@ -1,5 +1,6 @@
 package com.crm.controller;
 
+import com.crm.model.Note;
 import com.crm.model.Task;
 import com.crm.service.DialogService;
 import com.crm.service.ThemeService;
@@ -58,6 +59,7 @@ public final class CalendarController {
     private final Runnable dataChanged;
     private final Runnable showCalendar;
     private final Map<LocalDate, List<Task>> tasksByDate = new HashMap<>();
+    private NoteIntegration noteIntegration = NoteIntegration.EMPTY;
 
     private double dragAnchorY;
     private double dragAnchorX;
@@ -111,6 +113,14 @@ public final class CalendarController {
         updateSidebar();
     }
 
+    public void setNoteIntegration(NoteIntegration noteIntegration) {
+        this.noteIntegration = noteIntegration == null ? NoteIntegration.EMPTY : noteIntegration;
+        if (currentMiniMonth != null) {
+            render();
+            updateSidebar();
+        }
+    }
+
     public void applyState(Map<LocalDate, List<Task>> source, LocalDate selectedDate,
                            String selectedViewMode, double selectedZoom) {
         applyingState = true;
@@ -155,6 +165,7 @@ public final class CalendarController {
 
     public void deleteTask(LocalDate date, Task task) {
         if (date == null || task == null) return;
+        unlinkNotes(task.getId());
         removeTask(date, task);
         render();
         updateSidebar();
@@ -481,6 +492,21 @@ public final class CalendarController {
         updateTimeLabel(time, task.getStartMin(), task.getDuration());
         Label description = new Label(task.getDescription());
         description.getStyleClass().add("task-desc");
+        List<Note> linkedNotes = noteIntegration.notesForTask(task.getId());
+        MenuButton noteLink = null;
+        if (!linkedNotes.isEmpty()) {
+            MenuButton linkMenu = new MenuButton(linkedNotes.size() == 1 ? "Note" : linkedNotes.size() + " notes");
+            linkMenu.getStyleClass().add("calendar-note-link");
+            linkMenu.setFocusTraversable(false);
+            linkedNotes.forEach(linked -> {
+                MenuItem item = new MenuItem(linked.getTitle().isBlank() ? "Untitled note" : linked.getTitle());
+                item.setOnAction(event -> noteIntegration.openNote(linked.getId()));
+                linkMenu.getItems().add(item);
+            });
+            linkMenu.setOnMousePressed(javafx.event.Event::consume);
+            linkMenu.setOnMouseReleased(javafx.event.Event::consume);
+            noteLink = linkMenu;
+        }
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
         Region resizer = new Region();
@@ -551,12 +577,15 @@ public final class CalendarController {
         box.setOnKeyPressed(event -> {
             if (event.getCode() != KeyCode.BACK_SPACE && event.getCode() != KeyCode.DELETE) return;
             LocalDate date = viewMode.equals("Day") ? datePicker.getValue() : weekStartDate.plusDays(dayOffset);
+            unlinkNotes(task.getId());
             removeTask(date, task);
             render();
             updateSidebar();
             notifyDataChanged();
         });
-        box.getChildren().addAll(title, time, description, spacer, resizer);
+        box.getChildren().addAll(title, time, description);
+        if (noteLink != null) box.getChildren().add(noteLink);
+        box.getChildren().addAll(spacer, resizer);
         timelineArea.getChildren().add(box);
     }
 
@@ -613,7 +642,19 @@ public final class CalendarController {
             Label title = new Label(titleText);
             title.getStyleClass().add("activity-title");
             item.getChildren().addAll(time, title);
+            List<Note> linkedNotes = noteIntegration.notesForTask(task.getId());
+            if (!linkedNotes.isEmpty()) {
+                MenuButton note = new MenuButton(linkedNotes.size() == 1 ? "Open note" : "Open " + linkedNotes.size() + " notes");
+                note.getStyleClass().add("activity-note-link");
+                linkedNotes.forEach(linked -> {
+                    MenuItem menuItem = new MenuItem(linked.getTitle().isBlank() ? "Untitled note" : linked.getTitle());
+                    menuItem.setOnAction(event -> noteIntegration.openNote(linked.getId()));
+                    note.getItems().add(menuItem);
+                });
+                item.getChildren().add(note);
+            }
             item.setOnMouseClicked(event -> {
+                if (isButtonTarget(event.getTarget(), item)) return;
                 boolean openRequest = event.getButton() == MouseButton.SECONDARY
                         || event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 1;
                 if (!openRequest) return;
@@ -691,17 +732,40 @@ public final class CalendarController {
         ComboBox<String> color = new ComboBox<>(FXCollections.observableArrayList(
                 "Blue", "Red", "Green", "Yellow", "Orange", "Purple"));
         color.setValue(existingTask == null ? "Blue" : existingTask.getColor());
+        ComboBox<NoteChoice> note = new ComboBox<>();
+        NoteChoice noNote = new NoteChoice(null);
+        List<NoteChoice> noteChoices = new ArrayList<>();
+        noteChoices.add(noNote);
+        noteIntegration.notes().forEach(candidate -> noteChoices.add(new NoteChoice(candidate)));
+        note.setItems(FXCollections.observableArrayList(noteChoices));
+        note.setValue(noNote);
+        note.setPromptText("Choose a note");
         grid.add(new Label("Title:"), 0, 0); grid.add(title, 1, 0);
         grid.add(new Label("Date:"), 0, 1); grid.add(taskDate, 1, 1);
         grid.add(new Label("Start (H:M):"), 0, 2); grid.add(new HBox(5, startHour, new Label(":"), startMinute), 1, 2);
         grid.add(new Label("End (H:M):"), 0, 3); grid.add(new HBox(5, endHour, new Label(":"), endMinute), 1, 3);
         grid.add(new Label("Color:"), 0, 4); grid.add(color, 1, 4);
         grid.add(new Label("Description:"), 0, 5); grid.add(description, 1, 5);
+        grid.add(new Label("Link note:"), 0, 6); grid.add(note, 1, 6);
+        if (existingTask != null && !noteIntegration.notesForTask(existingTask.getId()).isEmpty()) {
+            HBox links = new HBox(6);
+            for (Note linked : noteIntegration.notesForTask(existingTask.getId())) {
+                Button open = new Button(linked.getTitle().isBlank() ? "Untitled note" : linked.getTitle());
+                open.getStyleClass().add("dialog-note-link");
+                open.setOnAction(event -> {
+                    dialog.close();
+                    noteIntegration.openNote(linked.getId());
+                });
+                links.getChildren().add(open);
+            }
+            grid.add(new Label("Linked:"), 0, 7); grid.add(links, 1, 7);
+        }
         dialog.getDialogPane().setContent(grid);
         Optional<ButtonType> result = dialog.showAndWait();
         if (result.isEmpty()) return;
         LocalDate dateToDisplay = sourceDate;
         if (result.get() == delete && existingTask != null) {
+            unlinkNotes(existingTask.getId());
             removeTask(sourceDate, existingTask);
         } else if (result.get() == save) {
             try {
@@ -733,6 +797,9 @@ public final class CalendarController {
                                 newEnd - newStart, color.getValue(), existingTask.isCompleted());
                 if (existingTask != null) removeTask(sourceDate, existingTask);
                 addTask(targetDate, replacement);
+                if (note.getValue() != null && note.getValue().note() != null) {
+                    note.getValue().note().setLinkedTaskId(replacement.getId());
+                }
                 dateToDisplay = targetDate;
             } catch (NumberFormatException exception) {
                 dialogService.showError("Invalid Time", "Use 00:00–23:59 for the start and up to 24:00 for the end.");
@@ -753,5 +820,37 @@ public final class CalendarController {
 
     private void notifyDataChanged() {
         if (!applyingState) dataChanged.run();
+    }
+
+    private void unlinkNotes(String taskId) {
+        noteIntegration.notesForTask(taskId).forEach(note -> note.setLinkedTaskId(""));
+    }
+
+    private boolean isButtonTarget(Object target, javafx.scene.Node boundary) {
+        if (!(target instanceof javafx.scene.Node node)) return false;
+        for (javafx.scene.Node current = node; current != null && current != boundary; current = current.getParent()) {
+            if (current instanceof ButtonBase) return true;
+        }
+        return false;
+    }
+
+    private record NoteChoice(Note note) {
+        @Override public String toString() {
+            if (note == null) return "Do not add a note";
+            String title = note.getTitle().isBlank() ? "Untitled note" : note.getTitle();
+            return title + " " + note.getFormat().extension();
+        }
+    }
+
+    public interface NoteIntegration {
+        NoteIntegration EMPTY = new NoteIntegration() {
+            @Override public List<Note> notes() { return List.of(); }
+            @Override public List<Note> notesForTask(String taskId) { return List.of(); }
+            @Override public void openNote(String noteId) { }
+        };
+
+        List<Note> notes();
+        List<Note> notesForTask(String taskId);
+        void openNote(String noteId);
     }
 }

@@ -18,9 +18,12 @@ import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.kordamp.ikonli.javafx.FontIcon;
+import org.fxmisc.richtext.CodeArea;
 
 import java.awt.image.BufferedImage;
 import java.time.LocalDate;
@@ -58,6 +61,7 @@ public final class MainController {
     @FXML private VBox contactsView;
     @FXML private VBox calendarView;
     @FXML private VBox tasksView;
+    @FXML private VBox notesView;
     @FXML private VBox genericView;
     @FXML private Label genericTitle;
     @FXML private FontIcon genericIcon;
@@ -91,6 +95,32 @@ public final class MainController {
     @FXML private Label tasksUpcomingCountLabel;
     @FXML private Label tasksCompletedCountLabel;
 
+    @FXML private VBox notesLibraryPane;
+    @FXML private VBox noteEditorPane;
+    @FXML private TextField notesSearchField;
+    @FXML private TilePane notesGrid;
+    @FXML private Label notesEmptyLabel;
+    @FXML private Label notesCountLabel;
+    @FXML private TextField noteTitleField;
+    @FXML private Label noteFormatLabel;
+    @FXML private ComboBox<NotesController.TaskOption> noteTaskCombo;
+    @FXML private Button noteOpenTaskButton;
+    @FXML private HBox markdownToolbar;
+    @FXML private ComboBox<String> noteFontFamilyCombo;
+    @FXML private ComboBox<Double> noteFontSizeCombo;
+    @FXML private ComboBox<String> noteFontWeightCombo;
+    @FXML private ToggleButton noteBoldToggle;
+    @FXML private ToggleButton noteItalicToggle;
+    @FXML private HBox notePreviewSettingsBar;
+    @FXML private ComboBox<String> notePreviewFontFamilyCombo;
+    @FXML private ComboBox<Double> notePreviewFontSizeCombo;
+    @FXML private ColorPicker notePreviewColorPicker;
+    @FXML private ToggleButton notePreviewToggle;
+    @FXML private CodeArea noteContentArea;
+    @FXML private ScrollPane notePreviewScroll;
+    @FXML private VBox notePreviewContent;
+    @FXML private Label noteEditorStatus;
+
     @FXML private Label homeGreetingLabel;
     @FXML private Label homeDateLabel;
     @FXML private Label homeContactsCountLabel;
@@ -116,6 +146,7 @@ public final class MainController {
     private ContactsController contactsController;
     private CalendarController calendarController;
     private TasksController tasksController;
+    private NotesController notesController;
     private AccountController accountController;
     private OverviewController overviewController;
     private NavigationController navigationController;
@@ -128,7 +159,7 @@ public final class MainController {
         themeService = new ThemeService(this::ownerWindow);
         dialogService = new DialogService(themeService);
         navigationController = new NavigationController(homeView, dashboardView,
-                contactsView, calendarView, tasksView, genericView,
+                contactsView, calendarView, tasksView, notesView, genericView,
                 genericTitle, genericIcon, sidebarContainer);
         overviewController = new OverviewController(
                 homeGreetingLabel, homeDateLabel,
@@ -147,6 +178,26 @@ public final class MainController {
                 calendarTimelineArea, calendarScrollPane, calendarDatePicker, viewModeCombo, selectedPeriodLabel,
                 miniMonthYearLabel, miniCalendarGrid, activitiesTitle, upcomingActivitiesList, themeService,
                 dialogService, this::handleDataChanged, navigationController::showCalendar);
+        notesController = new NotesController(notesLibraryPane, noteEditorPane, notesSearchField,
+                notesGrid, notesEmptyLabel, notesCountLabel, noteTitleField, noteFormatLabel,
+                noteTaskCombo, noteOpenTaskButton, markdownToolbar, notePreviewToggle,
+                noteFontFamilyCombo, noteFontSizeCombo, noteFontWeightCombo, noteBoldToggle, noteItalicToggle,
+                notePreviewSettingsBar, notePreviewFontFamilyCombo, notePreviewFontSizeCombo, notePreviewColorPicker,
+                noteContentArea, notePreviewScroll, notePreviewContent, noteEditorStatus,
+                themeService, new NotesController.NoteActions() {
+                    @Override public void dataChanged() { handleDataChanged(); }
+                    @Override public void showNotes() { navigationController.showNotes(); }
+                    @Override public void openTask(LocalDate date, com.crm.model.Task task) {
+                        calendarController.editTask(date, task);
+                    }
+                });
+        calendarController.setNoteIntegration(new CalendarController.NoteIntegration() {
+            @Override public List<com.crm.model.Note> notes() { return notesController.snapshot(); }
+            @Override public List<com.crm.model.Note> notesForTask(String taskId) {
+                return notesController.notesForTask(taskId);
+            }
+            @Override public void openNote(String noteId) { notesController.openById(noteId); }
+        });
         tasksController = new TasksController(taskSearchField, taskFilterCombo, taskListContainer,
                 tasksEmptyLabel, tasksTotalCountLabel, tasksTodayCountLabel,
                 tasksUpcomingCountLabel, tasksCompletedCountLabel, themeService,
@@ -163,6 +214,12 @@ public final class MainController {
                     @Override public void openCalendar(LocalDate date) {
                         calendarController.showTaskInCalendar(date);
                     }
+                    @Override public List<com.crm.model.Note> linkedNotes(String taskId) {
+                        return notesController.notesForTask(taskId);
+                    }
+                    @Override public void openNote(String noteId) {
+                        notesController.openById(noteId);
+                    }
                 });
         accountController = new AccountController(currentUserLabel, accountMenuButton,
                 defaultAvatarIcon, avatarImage, themeService, dialogService);
@@ -171,6 +228,7 @@ public final class MainController {
         contactsController.initialize();
         calendarController.initialize();
         tasksController.initialize();
+        notesController.initialize();
         overviewController.refresh(List.of(), Map.of());
         updateThemeButton();
         themeToggleBtn.sceneProperty().addListener((observable, oldScene, newScene) ->
@@ -189,6 +247,7 @@ public final class MainController {
         themeService.applyTo(themeToggleBtn.getScene());
         updateThemeButton();
         calendarController.refreshTheme();
+        notesController.refreshTheme();
         overviewController.setUser(user);
         refreshOverview();
         accountController.setCurrentUser(
@@ -220,6 +279,7 @@ public final class MainController {
         contactsController.setContacts(snapshot.contacts());
         calendarController.applyState(snapshot.tasksByDate(), snapshot.selectedDate(),
                 snapshot.calendarViewMode(), snapshot.calendarZoom());
+        notesController.applyState(snapshot.notes(), calendarController.tasksSnapshot());
         tasksController.refresh(calendarController.tasksSnapshot());
         refreshOverview();
     }
@@ -233,12 +293,13 @@ public final class MainController {
         Map<LocalDate, List<com.crm.model.Task>> tasks = calendarController.tasksSnapshot();
         overviewController.refresh(contactsController.snapshot(), tasks);
         tasksController.refresh(tasks);
+        notesController.refreshTasks(tasks);
     }
 
     private void saveCurrentData() {
         if (loadingWorkspace || calendarController.selectedDate() == null) return;
         CrmDataSnapshot snapshot = CrmDataSnapshot.detachedCopyOf(contactsController.snapshot(),
-                calendarController.tasksSnapshot(), calendarController.selectedDate(),
+                calendarController.tasksSnapshot(), notesController.snapshot(), calendarController.selectedDate(),
                 calendarController.viewMode(), calendarController.zoom());
         workspaceService.requestSave(snapshot, state -> Platform.runLater(() -> handleSaveState(state)));
     }
@@ -277,6 +338,19 @@ public final class MainController {
     @FXML private void handleNavigation(ActionEvent event) { navigationController.navigate(event); }
     @FXML private void handleAddContact() { contactsController.addContact(); }
     @FXML private void handleAddTask() { calendarController.createTask(LocalDate.now()); }
+    @FXML private void handleAddNote() { notesController.createNote(); }
+    @FXML private void handleCloseNote() { notesController.closeEditor(); }
+    @FXML private void handleDeleteNote() { notesController.deleteCurrent(); }
+    @FXML private void handleOpenLinkedTask() { notesController.openLinkedTask(); }
+    @FXML private void handleToggleNotePreview() { notesController.togglePreview(); }
+    @FXML private void handleMarkdownHeading() { notesController.markdownHeading(); }
+    @FXML private void handleMarkdownBold() { notesController.markdownBold(); }
+    @FXML private void handleMarkdownItalic() { notesController.markdownItalic(); }
+    @FXML private void handleMarkdownLink() { notesController.markdownLink(); }
+    @FXML private void handleMarkdownCode() { notesController.markdownCode(); }
+    @FXML private void handleMarkdownChecklist() { notesController.markdownChecklist(); }
+    @FXML private void handleResetNoteTypography() { notesController.resetTypography(); }
+    @FXML private void handleResetPreviewTypography() { notesController.resetPreviewTypography(); }
     @FXML private void handleToggleContactSelection() { contactsController.toggleSelection(); }
     @FXML private void handleDeleteContact() { contactsController.deleteSelectedContacts(); }
     @FXML private void handleMiniPrevMonth() { calendarController.previousMiniMonth(); }
@@ -301,6 +375,7 @@ public final class MainController {
         themeService.applyTo(themeToggleBtn.getScene());
         updateThemeButton();
         calendarController.refreshTheme();
+        notesController.refreshTheme();
         if (currentUser == null) return;
         currentUser.setPreferredTheme(themeService.activeTheme().name());
         try {

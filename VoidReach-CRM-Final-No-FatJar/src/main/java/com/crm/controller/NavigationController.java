@@ -16,19 +16,21 @@ public final class NavigationController {
     private final VBox contactsView;
     private final VBox calendarView;
     private final VBox tasksView;
+    private final VBox notesView;
     private final VBox genericView;
     private final Label genericTitle;
     private final FontIcon genericIcon;
     private final VBox sidebarContainer;
 
     public NavigationController(Node homeView, Node dashboardView,
-                                VBox contactsView, VBox calendarView, VBox tasksView, VBox genericView,
+                                VBox contactsView, VBox calendarView, VBox tasksView, VBox notesView, VBox genericView,
                                 Label genericTitle, FontIcon genericIcon, VBox sidebarContainer) {
         this.homeView = Objects.requireNonNull(homeView);
         this.dashboardView = Objects.requireNonNull(dashboardView);
         this.contactsView = Objects.requireNonNull(contactsView);
         this.calendarView = Objects.requireNonNull(calendarView);
         this.tasksView = Objects.requireNonNull(tasksView);
+        this.notesView = Objects.requireNonNull(notesView);
         this.genericView = Objects.requireNonNull(genericView);
         this.genericTitle = Objects.requireNonNull(genericTitle);
         this.genericIcon = Objects.requireNonNull(genericIcon);
@@ -41,6 +43,7 @@ public final class NavigationController {
         bindManagedToVisible(contactsView);
         bindManagedToVisible(calendarView);
         bindManagedToVisible(tasksView);
+        bindManagedToVisible(notesView);
         bindManagedToVisible(genericView);
     }
 
@@ -54,6 +57,7 @@ public final class NavigationController {
         else if (id.contains("Contacts")) contactsView.setVisible(true);
         else if (id.contains("Calendar")) calendarView.setVisible(true);
         else if (id.contains("Tasks")) tasksView.setVisible(true);
+        else if (id.contains("Notes")) notesView.setVisible(true);
         else showPlaceholder(id);
     }
 
@@ -63,6 +67,10 @@ public final class NavigationController {
 
     public void showCalendar() {
         showView(calendarView, "Calendar");
+    }
+
+    public void showNotes() {
+        showView(notesView, "Notes");
     }
 
     private void showView(Node view, String buttonIdPart) {
@@ -87,6 +95,7 @@ public final class NavigationController {
         contactsView.setVisible(false);
         calendarView.setVisible(false);
         tasksView.setVisible(false);
+        notesView.setVisible(false);
         genericView.setVisible(false);
     }
 

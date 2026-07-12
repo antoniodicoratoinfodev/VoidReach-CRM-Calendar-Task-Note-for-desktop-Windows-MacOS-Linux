@@ -2,6 +2,8 @@ package com.crm.repository;
 
 import com.crm.model.Contact;
 import com.crm.model.CrmDataSnapshot;
+import com.crm.model.Note;
+import com.crm.model.NoteFormat;
 import com.crm.model.Task;
 import com.crm.repository.CorruptRecordQuarantine.RejectedRecord;
 import java.io.IOException;
@@ -33,6 +35,7 @@ public class LocalCrmDataRepository implements CrmDataRepository {
         List<RejectedRecord> rejected = new ArrayList<>();
         List<Contact> contacts = new ArrayList<>();
         Map<LocalDate, List<Task>> tasks = new HashMap<>();
+        List<Note> notes = new ArrayList<>();
 
         for (int index : recordIndexes(properties, "contact.", "contacts.count", rejected)) {
             String prefix = "contact." + index + ".";
@@ -61,6 +64,27 @@ public class LocalCrmDataRepository implements CrmDataRepository {
             }
         }
 
+        for (int index : recordIndexes(properties, "note.", "notes.count", rejected)) {
+            String prefix = "note." + index + ".";
+            try {
+                notes.add(new Note(
+                        requiredNonBlank(properties, prefix + "id"),
+                        optionalValue(properties, prefix + "title", ""),
+                        optionalValue(properties, prefix + "content", ""),
+                        NoteFormat.valueOf(optionalValue(properties, prefix + "format", "TEXT")),
+                        optionalValue(properties, prefix + "linkedTaskId", ""),
+                        optionalValue(properties, prefix + "fontFamily", Note.DEFAULT_FONT_FAMILY),
+                        optionalDouble(properties, prefix + "fontSize", Note.DEFAULT_FONT_SIZE),
+                        optionalInteger(properties, prefix + "fontWeight", Note.DEFAULT_FONT_WEIGHT),
+                        Boolean.parseBoolean(optionalValue(properties, prefix + "italic", "false")),
+                        optionalValue(properties, prefix + "previewFontFamily", Note.DEFAULT_PREVIEW_FONT_FAMILY),
+                        optionalDouble(properties, prefix + "previewFontSize", Note.DEFAULT_PREVIEW_FONT_SIZE),
+                        optionalValue(properties, prefix + "previewTextColor", "")));
+            } catch (RuntimeException failure) {
+                rejected.add(CorruptRecordQuarantine.capture(properties, "note", String.valueOf(index), prefix, failure));
+            }
+        }
+
         LocalDate selectedDate = preference(properties, "calendar.selectedDate", LocalDate.now(), LocalDate::parse, rejected);
         String viewMode = preference(properties, "calendar.viewMode", "Day", value -> {
             if (!"Day".equals(value) && !"Week".equals(value)) throw new IllegalArgumentException("Invalid calendar view mode");
@@ -73,7 +97,7 @@ public class LocalCrmDataRepository implements CrmDataRepository {
         }, rejected);
 
         CorruptRecordQuarantine.writeBestEffort(file, rejected);
-        return new CrmDataSnapshot(contacts, tasks, selectedDate, viewMode, zoom);
+        return new CrmDataSnapshot(contacts, tasks, notes, selectedDate, viewMode, zoom);
     }
 
     @Override public synchronized void saveForUser(String userId, CrmDataSnapshot data) {
@@ -123,6 +147,23 @@ public class LocalCrmDataRepository implements CrmDataRepository {
             put(properties, prefix + "duration", String.valueOf(task.getDuration()));
             put(properties, prefix + "color", task.getColor());
             put(properties, prefix + "completed", String.valueOf(task.isCompleted()));
+        }
+        properties.setProperty("notes.count", String.valueOf(data.notes().size()));
+        for (int i = 0; i < data.notes().size(); i++) {
+            Note note = data.notes().get(i);
+            String prefix = "note." + i + ".";
+            put(properties, prefix + "id", note.getId());
+            put(properties, prefix + "title", note.getTitle());
+            put(properties, prefix + "content", note.getContent());
+            put(properties, prefix + "format", note.getFormat().name());
+            put(properties, prefix + "linkedTaskId", note.getLinkedTaskId());
+            put(properties, prefix + "fontFamily", note.getFontFamily());
+            put(properties, prefix + "fontSize", String.valueOf(note.getFontSize()));
+            put(properties, prefix + "fontWeight", String.valueOf(note.getFontWeight()));
+            put(properties, prefix + "italic", String.valueOf(note.isItalic()));
+            put(properties, prefix + "previewFontFamily", note.getPreviewFontFamily());
+            put(properties, prefix + "previewFontSize", String.valueOf(note.getPreviewFontSize()));
+            put(properties, prefix + "previewTextColor", note.getPreviewTextColor());
         }
         put(properties, "calendar.selectedDate", data.selectedDate().toString());
         put(properties, "calendar.viewMode", data.calendarViewMode());
@@ -183,6 +224,7 @@ public class LocalCrmDataRepository implements CrmDataRepository {
             return AtomicPropertiesStore.load(file, FILE_TYPE, SCHEMA_VERSION,
                     properties -> properties.containsKey("contacts.count")
                             || properties.containsKey("tasks.count")
+                            || properties.containsKey("notes.count")
                             || properties.containsKey("calendar.selectedDate"));
         } catch (IOException e) {
             throw new IllegalStateException("Local data could not be read", e);
@@ -192,6 +234,18 @@ public class LocalCrmDataRepository implements CrmDataRepository {
     Path dataFile(String userId) { return dataDirectory.resolve(userId + ".properties"); }
 
     private int requiredInteger(Properties properties, String key) { return flexibleInteger(properties.getProperty(key), key); }
+
+    private int optionalInteger(Properties properties, String key, int fallback) {
+        return properties.containsKey(key) ? flexibleInteger(properties.getProperty(key), key) : fallback;
+    }
+
+    private double optionalDouble(Properties properties, String key, double fallback) {
+        if (!properties.containsKey(key)) return fallback;
+        String value = requiredValue(properties, key);
+        double parsed = Double.parseDouble(value);
+        if (!Double.isFinite(parsed)) throw new IllegalArgumentException("Invalid number: " + key);
+        return parsed;
+    }
 
     private int flexibleInteger(String rawValue, String key) {
         if (rawValue == null) throw new IllegalArgumentException("Missing property: " + key);

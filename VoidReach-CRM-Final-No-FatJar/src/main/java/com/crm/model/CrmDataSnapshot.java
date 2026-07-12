@@ -9,9 +9,15 @@ import java.util.Map;
 public record CrmDataSnapshot(
         List<Contact> contacts,
         Map<LocalDate, List<Task>> tasksByDate,
+        List<Note> notes,
         LocalDate selectedDate,
         String calendarViewMode,
         double calendarZoom) {
+
+    public CrmDataSnapshot(List<Contact> contacts, Map<LocalDate, List<Task>> tasksByDate,
+                           LocalDate selectedDate, String calendarViewMode, double calendarZoom) {
+        this(contacts, tasksByDate, List.of(), selectedDate, calendarViewMode, calendarZoom);
+    }
 
     /**
      * Creates a detached state copy on the JavaFX thread before it is handed to I/O.
@@ -19,6 +25,7 @@ public record CrmDataSnapshot(
      */
     public static CrmDataSnapshot detachedCopyOf(List<Contact> contacts,
                                                    Map<LocalDate, List<Task>> tasksByDate,
+                                                   List<Note> notes,
                                                    LocalDate selectedDate,
                                                    String calendarViewMode,
                                                    double calendarZoom) {
@@ -36,7 +43,22 @@ public record CrmDataSnapshot(
                         task.getStartMin(), task.getDuration(), task.getColor(), task.isCompleted()))
                 .toList()));
 
-        return new CrmDataSnapshot(List.copyOf(copiedContacts), Map.copyOf(copiedTasks),
+        List<Note> copiedNotes = notes.stream()
+                .map(note -> new Note(note.getId(), note.getTitle(), note.getContent(),
+                        note.getFormat(), note.getLinkedTaskId(), note.getFontFamily(),
+                        note.getFontSize(), note.getFontWeight(), note.isItalic(),
+                        note.getPreviewFontFamily(), note.getPreviewFontSize(), note.getPreviewTextColor()))
+                .toList();
+
+        return new CrmDataSnapshot(List.copyOf(copiedContacts), Map.copyOf(copiedTasks), List.copyOf(copiedNotes),
                 selectedDate, calendarViewMode, calendarZoom);
+    }
+
+    public static CrmDataSnapshot detachedCopyOf(List<Contact> contacts,
+                                                  Map<LocalDate, List<Task>> tasksByDate,
+                                                  LocalDate selectedDate,
+                                                  String calendarViewMode,
+                                                  double calendarZoom) {
+        return detachedCopyOf(contacts, tasksByDate, List.of(), selectedDate, calendarViewMode, calendarZoom);
     }
 }

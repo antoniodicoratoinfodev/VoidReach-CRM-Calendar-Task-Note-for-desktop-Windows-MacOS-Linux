@@ -18,16 +18,29 @@ class CrmDataSnapshotTest {
         task.setCompleted(true);
         List<Contact> contacts = new ArrayList<>(List.of(contact));
         Map<LocalDate, List<Task>> tasks = Map.of(LocalDate.of(2026, 7, 12), new ArrayList<>(List.of(task)));
+        Note note = new Note("note-1", "Plan", "# Original", NoteFormat.MARKDOWN, "task-1",
+                "Georgia", 20, 700, true, "Arial", 24, "#123456");
 
-        CrmDataSnapshot snapshot = CrmDataSnapshot.detachedCopyOf(contacts, tasks,
+        CrmDataSnapshot snapshot = CrmDataSnapshot.detachedCopyOf(contacts, tasks, List.of(note),
                 LocalDate.of(2026, 7, 12), "Day", 1.0);
         contact.setName("Changed in UI");
         task.setStartMin(600);
         contacts.clear();
+        note.setContent("Changed in UI");
+        note.setFontSize(12);
 
         assertEquals("Ada", snapshot.contacts().getFirst().nameProperty().get());
         assertEquals(540, snapshot.tasksByDate().get(LocalDate.of(2026, 7, 12)).getFirst().getStartMin());
         assertTrue(snapshot.tasksByDate().get(LocalDate.of(2026, 7, 12)).getFirst().isCompleted());
+        assertEquals("# Original", snapshot.notes().getFirst().getContent());
+        assertEquals("task-1", snapshot.notes().getFirst().getLinkedTaskId());
+        assertEquals("Georgia", snapshot.notes().getFirst().getFontFamily());
+        assertEquals(20, snapshot.notes().getFirst().getFontSize());
+        assertEquals(700, snapshot.notes().getFirst().getFontWeight());
+        assertTrue(snapshot.notes().getFirst().isItalic());
+        assertEquals("Arial", snapshot.notes().getFirst().getPreviewFontFamily());
+        assertEquals(24, snapshot.notes().getFirst().getPreviewFontSize());
+        assertEquals("#123456", snapshot.notes().getFirst().getPreviewTextColor());
         assertThrows(UnsupportedOperationException.class, () -> snapshot.contacts().add(contact));
     }
 }
