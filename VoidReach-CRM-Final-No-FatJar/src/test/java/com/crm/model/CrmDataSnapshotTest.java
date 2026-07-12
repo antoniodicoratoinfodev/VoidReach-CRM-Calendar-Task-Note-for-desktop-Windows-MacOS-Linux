@@ -20,7 +20,7 @@ class CrmDataSnapshotTest {
         Map<LocalDate, List<Task>> tasks = Map.of(LocalDate.of(2026, 7, 12), new ArrayList<>(List.of(task)));
         Note note = new Note("note-1", "Plan", "# Original", NoteFormat.MARKDOWN, "task-1",
                 "Georgia", 20, 700, true, "Arial", 24, "#123456", "folder-1");
-        NoteFolder folder = new NoteFolder("folder-1", "Projects");
+        NoteFolder folder = new NoteFolder("folder-1", "Projects", "folder-parent");
 
         CrmDataSnapshot snapshot = CrmDataSnapshot.detachedCopyOf(contacts, tasks, List.of(note), List.of(folder),
                 LocalDate.of(2026, 7, 12), "Day", 1.0);
@@ -46,6 +46,7 @@ class CrmDataSnapshotTest {
         assertEquals("#123456", snapshot.notes().getFirst().getPreviewTextColor());
         assertEquals("folder-1", snapshot.notes().getFirst().getFolderId());
         assertEquals("Projects", snapshot.noteFolders().getFirst().getName());
+        assertEquals("folder-parent", snapshot.noteFolders().getFirst().getParentFolderId());
         assertThrows(UnsupportedOperationException.class, () -> snapshot.contacts().add(contact));
         assertThrows(UnsupportedOperationException.class, () -> snapshot.noteFolders().add(folder));
     }

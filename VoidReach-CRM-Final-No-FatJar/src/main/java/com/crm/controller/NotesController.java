@@ -7,6 +7,7 @@ import com.crm.model.Task;
 import com.crm.service.CodeSyntaxHighlighter;
 import com.crm.service.ThemeService;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -46,7 +47,7 @@ import java.util.regex.Pattern;
 public final class NotesController {
     private static final DataFormat NOTE_ID = new DataFormat("application/x-voidreach-note-id");
     private static final TaskOption NO_TASK = new TaskOption(null, null);
-    private static final FolderOption ROOT_FOLDER = new FolderOption(null);
+    private static final FolderOption ROOT_FOLDER = new FolderOption(null, "All notes");
     private static final List<Double> FONT_SIZES = List.of(
             12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0);
     private static final List<String> FONT_WEIGHTS = List.of("Regular", "Medium", "Semibold", "Bold");
@@ -64,7 +65,8 @@ public final class NotesController {
     private final TextField titleField;
     private final Label formatLabel;
     private final Button backButton;
-    private final Label locationLabel;
+    private final ScrollPane breadcrumbScroll;
+    private final HBox breadcrumbItems;
     private final ComboBox<FolderOption> folderCombo;
     private final ComboBox<TaskOption> taskCombo;
     private final Button openTaskButton;
@@ -95,7 +97,8 @@ public final class NotesController {
 
     public NotesController(VBox libraryPane, VBox editorPane, TextField searchField, TilePane grid,
                            Label emptyLabel, Label countLabel, TextField titleField, Label formatLabel,
-                           Button backButton, Label locationLabel, ComboBox<FolderOption> folderCombo,
+                           Button backButton, ScrollPane breadcrumbScroll, HBox breadcrumbItems,
+                           ComboBox<FolderOption> folderCombo,
                            ComboBox<TaskOption> taskCombo, Button openTaskButton, HBox markdownToolbar,
                            ToggleButton previewToggle, ComboBox<String> fontFamilyCombo,
                            ComboBox<Double> fontSizeCombo, ComboBox<String> fontWeightCombo,
@@ -114,7 +117,8 @@ public final class NotesController {
         this.titleField = Objects.requireNonNull(titleField);
         this.formatLabel = Objects.requireNonNull(formatLabel);
         this.backButton = Objects.requireNonNull(backButton);
-        this.locationLabel = Objects.requireNonNull(locationLabel);
+        this.breadcrumbScroll = Objects.requireNonNull(breadcrumbScroll);
+        this.breadcrumbItems = Objects.requireNonNull(breadcrumbItems);
         this.folderCombo = Objects.requireNonNull(folderCombo);
         this.taskCombo = Objects.requireNonNull(taskCombo);
         this.openTaskButton = Objects.requireNonNull(openTaskButton);
@@ -271,7 +275,7 @@ public final class NotesController {
             showFolderNameConflict();
             return;
         }
-        folders.add(new NoteFolder(name.get()));
+        folders.add(new NoteFolder(java.util.UUID.randomUUID().toString(), name.get(), currentFolderId));
         changed();
     }
 
@@ -280,6 +284,11 @@ public final class NotesController {
         searchField.clear();
         updateFolderNavigation();
         renderLibrary();
+    }
+
+    public void navigateUp() {
+        String parentId = findFolder(currentFolderId).map(NoteFolder::getParentFolderId).orElse("");
+        navigateToFolder(parentId);
     }
 
     public void openById(String noteId) {
@@ -418,8 +427,8 @@ public final class NotesController {
         if (grid == null) return;
         grid.getChildren().clear();
         String query = safe(searchField.getText()).trim().toLowerCase(Locale.ROOT);
-        List<NoteFolder> visibleFolders = query.isEmpty() && currentFolderId.isBlank()
-                ? List.copyOf(folders)
+        List<NoteFolder> visibleFolders = query.isEmpty()
+                ? folders.stream().filter(folder -> currentFolderId.equals(validParentId(folder))).toList()
                 : List.of();
         visibleFolders.forEach(folder -> grid.getChildren().add(folderCard(folder)));
         List<Note> visible = notes.stream().filter(note -> {
@@ -432,10 +441,14 @@ public final class NotesController {
         }).toList();
         visible.forEach(note -> grid.getChildren().add(noteCard(note)));
         if (query.isEmpty() && currentFolderId.isBlank()) {
-            countLabel.setText(notes.size() + (notes.size() == 1 ? " note" : " notes") + " · "
-                    + folders.size() + (folders.size() == 1 ? " folder" : " folders"));
+            long rootNotes = notes.stream().filter(this::isRootNote).count();
+            long rootFolders = visibleFolders.size();
+            countLabel.setText(rootNotes + (rootNotes == 1 ? " note" : " notes") + " · "
+                    + rootFolders + (rootFolders == 1 ? " folder" : " folders"));
         } else {
-            countLabel.setText(visible.size() + (visible.size() == 1 ? " note" : " notes"));
+            countLabel.setText(visible.size() + (visible.size() == 1 ? " note" : " notes")
+                    + (query.isEmpty() ? " · " + visibleFolders.size()
+                    + (visibleFolders.size() == 1 ? " folder" : " folders") : ""));
         }
         emptyLabel.setText(!query.isEmpty() ? "No notes match your search."
                 : currentFolderId.isBlank() ? "There are no notes or folders yet. Create one to get started."
@@ -449,9 +462,42 @@ public final class NotesController {
         icon.getStyleClass().add("note-folder-icon");
         Label title = new Label(folder.getName());
         title.getStyleClass().add("note-folder-title");
-        long noteCount = notes.stream().filter(note -> folder.getId().equals(note.getFolderId())).count();
+        List<Note> folderNotes = notes.stream()
+                .filter(note -> folder.getId().equals(note.getFolderId()))
+                .toList();
+        long noteCount = folderNotes.size();
         Label count = new Label(noteCount + (noteCount == 1 ? " note" : " notes"));
         count.getStyleClass().add("note-folder-count");
+        long childFolderCount = folders.stream()
+                .filter(candidate -> folder.getId().equals(validParentId(candidate))).count();
+        if (childFolderCount > 0) {
+            count.setText(count.getText() + " · " + childFolderCount
+                    + (childFolderCount == 1 ? " folder" : " folders"));
+        }
+
+        VBox containedNotes = new VBox(4);
+        containedNotes.getStyleClass().add("note-folder-files");
+        if (folderNotes.isEmpty()) {
+            Label empty = new Label("No notes inside");
+            empty.getStyleClass().addAll("note-folder-file-title", "note-folder-file-empty");
+            containedNotes.getChildren().add(empty);
+        } else {
+            folderNotes.forEach(note -> {
+                Label noteTitle = new Label("•  " + displayTitle(note));
+                noteTitle.setMaxWidth(Double.MAX_VALUE);
+                noteTitle.setTextOverrun(OverrunStyle.ELLIPSIS);
+                noteTitle.setTooltip(new Tooltip(displayTitle(note)));
+                noteTitle.getStyleClass().add("note-folder-file-title");
+                containedNotes.getChildren().add(noteTitle);
+            });
+        }
+        ScrollPane containedNotesScroll = new ScrollPane(containedNotes);
+        containedNotesScroll.setFitToWidth(true);
+        containedNotesScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        containedNotesScroll.setVbarPolicy(folderNotes.size() > 3
+                ? ScrollPane.ScrollBarPolicy.AS_NEEDED : ScrollPane.ScrollBarPolicy.NEVER);
+        containedNotesScroll.setMaxHeight(66);
+        containedNotesScroll.getStyleClass().add("note-folder-files-scroll");
 
         MenuItem rename = new MenuItem("Rename");
         rename.setOnAction(event -> renameFolder(folder));
@@ -466,7 +512,7 @@ public final class NotesController {
         HBox header = new HBox(8, icon, spacer, menu);
         header.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(12, header, title, count);
+        VBox card = new VBox(9, header, title, count, containedNotesScroll);
         card.getStyleClass().add("note-folder-card");
         card.setPrefWidth(250);
         card.setOnMouseClicked(event -> openFolder(folder));
@@ -536,7 +582,10 @@ public final class NotesController {
             card.getStyleClass().add("note-card-dragging");
             event.consume();
         });
-        card.setOnDragDone(event -> card.getStyleClass().remove("note-card-dragging"));
+        card.setOnDragDone(event -> {
+            card.getStyleClass().remove("note-card-dragging");
+            clearBreadcrumbDropTarget();
+        });
         card.setOnDragEntered(event -> {
             if (event.getGestureSource() != card && event.getDragboard().hasContent(NOTE_ID)) {
                 card.getStyleClass().add("note-card-drop-target");
@@ -566,10 +615,7 @@ public final class NotesController {
     }
 
     private void openFolder(NoteFolder folder) {
-        currentFolderId = folder.getId();
-        searchField.clear();
-        updateFolderNavigation();
-        renderLibrary();
+        navigateToFolder(folder.getId());
     }
 
     private void updateFolderNavigation() {
@@ -578,13 +624,72 @@ public final class NotesController {
         boolean insideFolder = current != null;
         backButton.setVisible(insideFolder);
         backButton.setManaged(insideFolder);
-        locationLabel.setText(insideFolder ? current.getName() : "All notes");
+        renderBreadcrumb();
+    }
+
+    private void renderBreadcrumb() {
+        breadcrumbItems.getChildren().clear();
+        addBreadcrumbSegment("Home", "");
+        for (NoteFolder folder : folderTrail(currentFolderId)) {
+            Label separator = new Label("›");
+            separator.getStyleClass().add("note-breadcrumb-separator");
+            breadcrumbItems.getChildren().add(separator);
+            addBreadcrumbSegment(folder.getName(), folder.getId());
+        }
+        Platform.runLater(() -> breadcrumbScroll.setHvalue(1.0));
+    }
+
+    private void addBreadcrumbSegment(String text, String folderId) {
+        Button segment = new Button(text);
+        segment.getStyleClass().add("note-breadcrumb-segment");
+        segment.setOnAction(event -> navigateToFolder(folderId));
+        segment.setOnDragOver(event -> {
+            if (event.getDragboard().hasContent(NOTE_ID)) event.acceptTransferModes(TransferMode.MOVE);
+            event.consume();
+        });
+        segment.setOnDragEntered(event -> {
+            if (event.getDragboard().hasContent(NOTE_ID)) {
+                showBreadcrumbDropTarget(segment);
+            }
+        });
+        segment.setOnDragExited(event -> segment.getStyleClass().remove("note-breadcrumb-drop-target"));
+        segment.setOnDragDropped(event -> {
+            clearBreadcrumbDropTarget();
+            Object draggedId = event.getDragboard().getContent(NOTE_ID);
+            Note dragged = notes.stream().filter(note -> note.getId().equals(draggedId)).findFirst().orElse(null);
+            if (dragged == null) {
+                event.setDropCompleted(false);
+                return;
+            }
+            dragged.setFolderId(folderId);
+            changed();
+            event.setDropCompleted(true);
+            event.consume();
+        });
+        breadcrumbItems.getChildren().add(segment);
+    }
+
+    private void showBreadcrumbDropTarget(Button target) {
+        clearBreadcrumbDropTarget();
+        target.getStyleClass().add("note-breadcrumb-drop-target");
+    }
+
+    private void clearBreadcrumbDropTarget() {
+        breadcrumbItems.getChildren().forEach(node ->
+                node.getStyleClass().remove("note-breadcrumb-drop-target"));
+    }
+
+    private void navigateToFolder(String folderId) {
+        currentFolderId = safe(folderId);
+        searchField.clear();
+        updateFolderNavigation();
+        renderLibrary();
     }
 
     private void refreshFolderChoices() {
         List<FolderOption> options = new ArrayList<>();
         options.add(ROOT_FOLDER);
-        folders.forEach(folder -> options.add(new FolderOption(folder)));
+        folders.forEach(folder -> options.add(new FolderOption(folder, folderPath(folder))));
         folderCombo.setItems(FXCollections.observableArrayList(options));
         FolderOption selected = options.stream()
                 .filter(option -> option.folder() != null
@@ -608,18 +713,23 @@ public final class NotesController {
 
     private void deleteFolder(NoteFolder folder) {
         long noteCount = notes.stream().filter(note -> folder.getId().equals(note.getFolderId())).count();
+        long childFolderCount = folders.stream()
+                .filter(candidate -> folder.getId().equals(validParentId(candidate))).count();
         Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
         confirmation.setTitle("Delete folder");
         confirmation.setHeaderText("Delete “" + folder.getName() + "”?");
-        confirmation.setContentText(noteCount == 0
+        confirmation.setContentText(noteCount == 0 && childFolderCount == 0
                 ? "The empty folder will be deleted."
-                : noteCount + (noteCount == 1 ? " note will" : " notes will") + " be moved to All notes.");
+                : "Its notes and subfolders will be moved to the parent location.");
         themeService.applyTo(confirmation);
         if (confirmation.showAndWait().filter(ButtonType.OK::equals).isEmpty()) return;
+        String parentId = validParentId(folder);
         notes.stream().filter(note -> folder.getId().equals(note.getFolderId()))
-                .forEach(note -> note.setFolderId(""));
+                .forEach(note -> note.setFolderId(parentId));
+        folders.stream().filter(candidate -> folder.getId().equals(candidate.getParentFolderId()))
+                .forEach(candidate -> candidate.setParentFolderId(parentId));
         folders.remove(folder);
-        if (folder.getId().equals(currentFolderId)) currentFolderId = "";
+        if (folder.getId().equals(currentFolderId)) currentFolderId = parentId;
         updateFolderNavigation();
         changed();
     }
@@ -648,7 +758,9 @@ public final class NotesController {
     }
 
     private boolean folderNameExists(String name, NoteFolder excluded) {
-        return folders.stream().anyMatch(folder -> folder != excluded && folder.getName().equalsIgnoreCase(name));
+        String parentId = excluded == null ? currentFolderId : validParentId(excluded);
+        return folders.stream().anyMatch(folder -> folder != excluded
+                && validParentId(folder).equals(parentId) && folder.getName().equalsIgnoreCase(name));
     }
 
     private void showFolderNameConflict() {
@@ -666,6 +778,31 @@ public final class NotesController {
 
     private boolean isRootNote(Note note) {
         return note.getFolderId().isBlank() || findFolder(note.getFolderId()).isEmpty();
+    }
+
+    private String validParentId(NoteFolder folder) {
+        return findFolder(folder.getParentFolderId()).isPresent() ? folder.getParentFolderId() : "";
+    }
+
+    private List<NoteFolder> folderTrail(String folderId) {
+        List<NoteFolder> reversed = new ArrayList<>();
+        String cursor = safe(folderId);
+        int guard = folders.size() + 1;
+        while (!cursor.isBlank() && guard-- > 0) {
+            NoteFolder folder = findFolder(cursor).orElse(null);
+            if (folder == null || reversed.contains(folder)) break;
+            reversed.add(folder);
+            cursor = validParentId(folder);
+        }
+        Collections.reverse(reversed);
+        return reversed;
+    }
+
+    private String folderPath(NoteFolder folder) {
+        return "Home › " + folderTrail(folder.getId()).stream()
+                .map(NoteFolder::getName)
+                .reduce((left, right) -> left + " › " + right)
+                .orElse(folder.getName());
     }
 
     private void refreshTaskChoices() {
@@ -1132,9 +1269,9 @@ public final class NotesController {
         }
     }
 
-    public record FolderOption(NoteFolder folder) {
+    public record FolderOption(NoteFolder folder, String displayName) {
         @Override public String toString() {
-            return folder == null ? "All notes" : folder.getName();
+            return displayName;
         }
     }
 

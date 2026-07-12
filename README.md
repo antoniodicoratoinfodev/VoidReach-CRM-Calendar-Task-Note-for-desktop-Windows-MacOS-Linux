@@ -127,6 +127,9 @@ The Notes section provides a per-account knowledge workspace.
 
 - Create any number of notes.
 - Create persistent folders with **Add folder** and open them like a dedicated workspace.
+- Create nested folders by using **Add folder** while another folder is open.
+- Navigate the complete clickable breadcrumb path, such as **Home › Projects › Client A**.
+- Drop a note onto any breadcrumb segment to move it directly to that location.
 - Drag a complete note card onto a folder to move it there.
 - Move a note between folders, or back to **All notes**, from the folder selector in the editor.
 - Rename folders or delete them; deleting a folder safely moves its notes back to **All notes**.

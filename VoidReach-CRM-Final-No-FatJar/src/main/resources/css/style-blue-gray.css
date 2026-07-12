@@ -157,7 +157,15 @@
 .notes-view, .notes-library, .note-editor { -fx-background-color: #182337; }
 .notes-breadcrumb-bar, .note-folder-card { -fx-background-color: #202d42; -fx-border-color: #3a4960; }
 .notes-location-label, .note-folder-title { -fx-text-fill: #f3f5f9; }
+.note-breadcrumb-segment { -fx-text-fill: #dce4ef; }
+.note-breadcrumb-segment:hover { -fx-background-color: #263c60; -fx-text-fill: #cfe0ff; }
+.note-breadcrumb-drop-target {
+    -fx-background-color: #3d3424; -fx-text-fill: #ffd166;
+    -fx-border-color: #ffd166; -fx-effect: dropshadow(gaussian, rgba(255,209,102,0.28), 9, 0.18, 0, 1);
+}
 .note-folder-count { -fx-text-fill: #9ca9bc; }
+.note-folder-file-title { -fx-text-fill: #c9d2df; }
+.note-folder-file-empty { -fx-text-fill: #8190a8; }
 .note-folder-card:hover { -fx-background-color: #302d2a; -fx-border-color: #f5b942; }
 .note-folder-drop-target { -fx-background-color: #3d3424; -fx-border-color: #ffd166; }
 .note-folder-location-icon, .note-folder-icon { -fx-icon-color: #f5b942; }

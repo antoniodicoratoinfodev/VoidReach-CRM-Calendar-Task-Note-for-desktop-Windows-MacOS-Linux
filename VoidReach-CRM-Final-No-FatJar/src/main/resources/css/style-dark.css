@@ -1153,6 +1153,21 @@
     -fx-border-color: #263449; -fx-border-radius: 10;
 }
 .notes-location-label { -fx-text-fill: #cbd5e1; -fx-font-size: 12px; -fx-font-weight: 800; }
+.note-breadcrumb-scroll, .note-breadcrumb-scroll > .viewport {
+    -fx-background-color: transparent; -fx-background: transparent;
+}
+.note-breadcrumb-scroll { -fx-border-color: transparent; -fx-padding: 0; }
+.note-breadcrumb-segment {
+    -fx-background-color: transparent; -fx-background-radius: 7;
+    -fx-text-fill: #cbd5e1; -fx-font-size: 12px; -fx-font-weight: 800;
+    -fx-padding: 5 7; -fx-cursor: hand;
+}
+.note-breadcrumb-segment:hover { -fx-background-color: #172554; -fx-text-fill: #93c5fd; }
+.note-breadcrumb-separator { -fx-text-fill: #64748b; -fx-font-size: 14px; }
+.note-breadcrumb-drop-target {
+    -fx-background-color: #3a2a13; -fx-text-fill: #fbbf24;
+    -fx-border-color: #fbbf24; -fx-effect: dropshadow(gaussian, rgba(251,191,36,0.28), 9, 0.18, 0, 1);
+}
 .note-folder-location-icon, .note-folder-icon { -fx-icon-color: #fbbf24; }
 .note-folder-back { -fx-min-width: 28; -fx-min-height: 26; -fx-pref-width: 28; -fx-pref-height: 26; }
 .note-folder-card {
@@ -1166,6 +1181,13 @@
 .note-folder-drop-target { -fx-border-color: #fbbf24; -fx-border-width: 2; -fx-background-color: #3a2a13; }
 .note-folder-title { -fx-text-fill: #f1f5f9; -fx-font-size: 15px; -fx-font-weight: 800; }
 .note-folder-count { -fx-text-fill: #94a3b8; -fx-font-size: 11px; }
+.note-folder-files-scroll, .note-folder-files-scroll > .viewport {
+    -fx-background-color: transparent; -fx-background: transparent;
+}
+.note-folder-files-scroll { -fx-padding: 0; -fx-border-color: transparent; }
+.note-folder-files { -fx-padding: 1 5 1 0; }
+.note-folder-file-title { -fx-text-fill: #cbd5e1; -fx-font-size: 10px; }
+.note-folder-file-empty { -fx-text-fill: #64748b; -fx-font-style: italic; }
 .note-folder-menu { -fx-min-width: 28; -fx-min-height: 28; -fx-padding: 0; }
 .note-folder-menu .ikonli-font-icon { -fx-icon-color: #94a3b8; }
 .note-folder-combo { -fx-min-height: 38; }

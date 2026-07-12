@@ -60,7 +60,7 @@ public record CrmDataSnapshot(
                 .toList();
 
         List<NoteFolder> copiedFolders = noteFolders.stream()
-                .map(folder -> new NoteFolder(folder.getId(), folder.getName()))
+                .map(folder -> new NoteFolder(folder.getId(), folder.getName(), folder.getParentFolderId()))
                 .toList();
 
         return new CrmDataSnapshot(List.copyOf(copiedContacts), Map.copyOf(copiedTasks), List.copyOf(copiedNotes),

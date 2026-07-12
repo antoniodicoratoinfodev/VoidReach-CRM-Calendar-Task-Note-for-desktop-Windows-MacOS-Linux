@@ -71,7 +71,8 @@ class LocalCrmDataRepositoryTest {
         LocalCrmDataRepository repository = new LocalCrmDataRepository(directory);
         LocalDate date = LocalDate.of(2026, 7, 12);
         Task task = new Task("task-linked", "Ship release", "", 600, 45, "Blue");
-        NoteFolder projects = new NoteFolder("folder-projects", "Projects");
+        NoteFolder workspace = new NoteFolder("folder-workspace", "Workspace");
+        NoteFolder projects = new NoteFolder("folder-projects", "Projects", workspace.getId());
         Note markdown = new Note("note-md", "Release plan", "# Plan\n\n- [ ] Ship\n[[Research]] ✨",
                 NoteFormat.MARKDOWN, task.getId(), "Georgia", 22, 700, true,
                 "Arial", 26, "#224466", projects.getId());
@@ -79,7 +80,7 @@ class LocalCrmDataRepositoryTest {
                 NoteFormat.TEXT, "");
 
         repository.saveForUser("notes-account", new CrmDataSnapshot(
-                List.of(), Map.of(date, List.of(task)), List.of(markdown, text), List.of(projects),
+                List.of(), Map.of(date, List.of(task)), List.of(markdown, text), List.of(workspace, projects),
                 date, "Day", 1.0));
 
         CrmDataSnapshot loaded = repository.loadForUser("notes-account");
@@ -96,8 +97,10 @@ class LocalCrmDataRepositoryTest {
         assertEquals(26, loaded.notes().getFirst().getPreviewFontSize());
         assertEquals("#224466", loaded.notes().getFirst().getPreviewTextColor());
         assertEquals("folder-projects", loaded.notes().getFirst().getFolderId());
-        assertEquals(List.of("folder-projects"), loaded.noteFolders().stream().map(NoteFolder::getId).toList());
-        assertEquals("Projects", loaded.noteFolders().getFirst().getName());
+        assertEquals(List.of("folder-workspace", "folder-projects"),
+                loaded.noteFolders().stream().map(NoteFolder::getId).toList());
+        assertEquals("folder-workspace", loaded.noteFolders().get(1).getParentFolderId());
+        assertEquals("Projects", loaded.noteFolders().get(1).getName());
         assertEquals(NoteFormat.TEXT, loaded.notes().get(1).getFormat());
         assertEquals(Note.DEFAULT_FONT_SIZE, loaded.notes().get(1).getFontSize());
         assertEquals("", loaded.notes().get(1).getFolderId());

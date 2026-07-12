@@ -102,7 +102,8 @@ public final class MainController {
     @FXML private Label notesEmptyLabel;
     @FXML private Label notesCountLabel;
     @FXML private Button notesBackButton;
-    @FXML private Label notesLocationLabel;
+    @FXML private ScrollPane notesBreadcrumbScroll;
+    @FXML private HBox notesBreadcrumbItems;
     @FXML private TextField noteTitleField;
     @FXML private Label noteFormatLabel;
     @FXML private ComboBox<NotesController.FolderOption> noteFolderCombo;
@@ -183,7 +184,7 @@ public final class MainController {
                 dialogService, this::handleDataChanged, navigationController::showCalendar);
         notesController = new NotesController(notesLibraryPane, noteEditorPane, notesSearchField,
                 notesGrid, notesEmptyLabel, notesCountLabel, noteTitleField, noteFormatLabel,
-                notesBackButton, notesLocationLabel, noteFolderCombo,
+                notesBackButton, notesBreadcrumbScroll, notesBreadcrumbItems, noteFolderCombo,
                 noteTaskCombo, noteOpenTaskButton, markdownToolbar, notePreviewToggle,
                 noteFontFamilyCombo, noteFontSizeCombo, noteFontWeightCombo, noteBoldToggle, noteItalicToggle,
                 notePreviewSettingsBar, notePreviewFontFamilyCombo, notePreviewFontSizeCombo, notePreviewColorPicker,
@@ -344,7 +345,7 @@ public final class MainController {
     @FXML private void handleAddTask() { calendarController.createTask(LocalDate.now()); }
     @FXML private void handleAddNote() { notesController.createNote(); }
     @FXML private void handleAddNoteFolder() { notesController.createFolder(); }
-    @FXML private void handleOpenNotesRoot() { notesController.openRoot(); }
+    @FXML private void handleOpenNotesRoot() { notesController.navigateUp(); }
     @FXML private void handleCloseNote() { notesController.closeEditor(); }
     @FXML private void handleDeleteNote() { notesController.deleteCurrent(); }
     @FXML private void handleOpenLinkedTask() { notesController.openLinkedTask(); }

@@ -379,7 +379,10 @@
                                     <graphic><FontIcon iconLiteral="fas-arrow-left" iconSize="11" styleClass="toolbar-icon"/></graphic>
                                 </Button>
                                 <FontIcon iconLiteral="fas-folder-open" iconSize="13" styleClass="note-folder-location-icon"/>
-                                <Label fx:id="notesLocationLabel" text="All notes" styleClass="notes-location-label"/>
+                                <ScrollPane fx:id="notesBreadcrumbScroll" fitToHeight="true" hbarPolicy="AS_NEEDED" vbarPolicy="NEVER"
+                                            styleClass="note-breadcrumb-scroll" HBox.hgrow="ALWAYS">
+                                    <HBox fx:id="notesBreadcrumbItems" spacing="3" alignment="CENTER_LEFT"/>
+                                </ScrollPane>
                             </HBox>
                             <HBox spacing="10" alignment="CENTER_LEFT" styleClass="toolbar-card">
                                 <TextField fx:id="notesSearchField" promptText="Search notes…" styleClass="search-bar" HBox.hgrow="ALWAYS"/>

@@ -71,7 +71,8 @@ public class LocalCrmDataRepository implements CrmDataRepository {
             try {
                 noteFolders.add(new NoteFolder(
                         requiredNonBlank(properties, prefix + "id"),
-                        requiredNonBlank(properties, prefix + "name")));
+                        requiredNonBlank(properties, prefix + "name"),
+                        optionalValue(properties, prefix + "parentFolderId", "")));
             } catch (RuntimeException failure) {
                 rejected.add(CorruptRecordQuarantine.capture(properties, "noteFolder", String.valueOf(index), prefix, failure));
             }
@@ -186,6 +187,7 @@ public class LocalCrmDataRepository implements CrmDataRepository {
             String prefix = "noteFolder." + i + ".";
             put(properties, prefix + "id", folder.getId());
             put(properties, prefix + "name", folder.getName());
+            put(properties, prefix + "parentFolderId", folder.getParentFolderId());
         }
         put(properties, "calendar.selectedDate", data.selectedDate().toString());
         put(properties, "calendar.viewMode", data.calendarViewMode());
