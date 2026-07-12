@@ -278,6 +278,7 @@ public final class NotesController {
     public void openRoot() {
         currentFolderId = "";
         searchField.clear();
+        updateFolderNavigation();
         renderLibrary();
     }
 
