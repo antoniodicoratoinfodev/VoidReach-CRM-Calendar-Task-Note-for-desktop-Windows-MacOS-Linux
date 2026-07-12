@@ -1027,6 +1027,12 @@
 .dialog-pane .button:hover { -fx-background-color: #334155; -fx-border-color: #475569; }
 .dialog-pane .button:default { -fx-background-color: #2563eb; -fx-border-color: #2563eb; -fx-text-fill: white; }
 .dialog-pane .button:default:hover { -fx-background-color: #3b82f6; }
+.dialog-pane .task-note-selector {
+    -fx-min-height: 36; -fx-background-color: #1e293b; -fx-background-radius: 8;
+    -fx-border-color: #334155; -fx-border-radius: 8; -fx-cursor: hand;
+}
+.dialog-pane .task-note-selector .label { -fx-text-fill: #e2e8f0; }
+.dialog-pane .task-note-selector .arrow { -fx-background-color: #94a3b8; }
 .auth-page { -fx-background-color: linear-gradient(to bottom right, #070d1a, #111b36, #0b1120); -fx-padding: 36; }
 .auth-card {
     -fx-background-color: #111a2c; -fx-background-radius: 20; -fx-padding: 36;

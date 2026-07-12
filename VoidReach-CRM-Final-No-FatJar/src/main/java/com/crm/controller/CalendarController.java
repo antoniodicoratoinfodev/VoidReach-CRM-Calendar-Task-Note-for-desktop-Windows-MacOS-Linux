@@ -755,6 +755,7 @@ public final class CalendarController {
                 "Blue", "Red", "Green", "Yellow", "Orange", "Purple"));
         color.setValue(existingTask == null ? "Blue" : existingTask.getColor());
         MenuButton noteMenu = new MenuButton("No linked notes");
+        noteMenu.getStyleClass().add("task-note-selector");
         noteMenu.setMaxWidth(Double.MAX_VALUE);
         Map<Note, CheckMenuItem> noteSelections = new java.util.LinkedHashMap<>();
         String existingTaskId = existingTask == null ? "" : existingTask.getId();

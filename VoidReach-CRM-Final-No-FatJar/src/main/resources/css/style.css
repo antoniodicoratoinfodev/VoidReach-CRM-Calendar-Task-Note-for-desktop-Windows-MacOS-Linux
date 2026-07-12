@@ -742,6 +742,16 @@
 .dialog-pane .button:hover { -fx-background-color: #f1f5f9; -fx-border-color: #cbd5e1; }
 .dialog-pane .button:default { -fx-background-color: #2563eb; -fx-border-color: #2563eb; -fx-text-fill: white; }
 .dialog-pane .button:default:hover { -fx-background-color: #1d4ed8; }
+.dialog-pane .task-note-selector {
+    -fx-min-height: 36; -fx-background-color: #f8fafc; -fx-background-radius: 8;
+    -fx-border-color: #dbe2ea; -fx-border-radius: 8; -fx-cursor: hand;
+}
+.dialog-pane .task-note-selector .label { -fx-text-fill: #334155; }
+.dialog-pane .task-note-selector .arrow { -fx-background-color: #64748b; }
+.context-menu { -fx-background-color: #ffffff; -fx-border-color: #dbe2ea; }
+.context-menu .menu-item .label { -fx-text-fill: #1e293b; }
+.context-menu .menu-item:focused { -fx-background-color: #eff6ff; }
+.context-menu .menu-item:focused .label { -fx-text-fill: #1d4ed8; }
 
 /* Home and dashboard */
 .overview-scroll, .overview-scroll > .viewport { -fx-background-color: #f4f7fb; -fx-background: #f4f7fb; }

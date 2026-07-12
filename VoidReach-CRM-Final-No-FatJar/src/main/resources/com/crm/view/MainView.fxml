@@ -395,18 +395,25 @@
                         </VBox>
 
                         <VBox fx:id="noteEditorPane" visible="false" spacing="12" styleClass="note-editor">
-                            <HBox alignment="CENTER_LEFT" spacing="10" styleClass="note-editor-header">
-                                <Button onAction="#handleCloseNote" styleClass="icon-button, note-back-button">
-                                    <graphic><FontIcon iconLiteral="fas-arrow-left" iconSize="13" styleClass="toolbar-icon"/></graphic>
-                                    <tooltip><Tooltip text="Back to notes"/></tooltip>
-                                </Button>
-                                <TextField fx:id="noteTitleField" promptText="Untitled note" styleClass="note-title-field" HBox.hgrow="ALWAYS"/>
-                                <Label fx:id="noteFormatLabel" text=".txt" styleClass="note-format-badge"/>
-                                <ComboBox fx:id="noteFolderCombo" promptText="Folder" prefWidth="180" styleClass="note-folder-combo"/>
-                                <ComboBox fx:id="noteTaskCombo" promptText="Link another task" prefWidth="230" styleClass="note-task-combo"/>
-                                <MenuButton fx:id="noteOpenTaskButton" text="Linked tasks" styleClass="btn-secondary, note-open-task"/>
-                                <Button text="Delete" onAction="#handleDeleteNote" styleClass="btn-secondary, danger-button"/>
-                            </HBox>
+                            <VBox spacing="8" styleClass="note-editor-header">
+                                <HBox alignment="CENTER_LEFT" spacing="10">
+                                    <Button onAction="#handleCloseNote" styleClass="icon-button, note-back-button">
+                                        <graphic><FontIcon iconLiteral="fas-arrow-left" iconSize="13" styleClass="toolbar-icon"/></graphic>
+                                        <tooltip><Tooltip text="Back to notes"/></tooltip>
+                                    </Button>
+                                    <TextField fx:id="noteTitleField" promptText="Untitled note" styleClass="note-title-field" HBox.hgrow="ALWAYS"/>
+                                    <Label fx:id="noteFormatLabel" text=".txt" styleClass="note-format-badge"/>
+                                    <Button text="Delete" onAction="#handleDeleteNote" styleClass="btn-secondary, danger-button"/>
+                                </HBox>
+                                <HBox alignment="CENTER_LEFT" spacing="10" styleClass="note-editor-link-row">
+                                    <Label text="Folder" styleClass="note-toolbar-label"/>
+                                    <ComboBox fx:id="noteFolderCombo" promptText="Folder" prefWidth="220" styleClass="note-folder-combo"/>
+                                    <Label text="Tasks" styleClass="note-toolbar-label"/>
+                                    <ComboBox fx:id="noteTaskCombo" promptText="Link another task" prefWidth="280" styleClass="note-task-combo"/>
+                                    <MenuButton fx:id="noteOpenTaskButton" text="Linked tasks" styleClass="btn-secondary, note-open-task"/>
+                                    <Region HBox.hgrow="ALWAYS"/>
+                                </HBox>
+                            </VBox>
                             <HBox spacing="7" alignment="CENTER_LEFT" styleClass="note-typography-toolbar">
                                 <Label text="Typography" styleClass="note-toolbar-label"/>
                                 <ComboBox fx:id="noteFontFamilyCombo" promptText="Font" prefWidth="190" styleClass="note-font-control"/>
