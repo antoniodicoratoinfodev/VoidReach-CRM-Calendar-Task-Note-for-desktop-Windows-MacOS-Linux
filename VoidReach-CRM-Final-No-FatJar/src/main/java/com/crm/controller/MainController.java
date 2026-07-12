@@ -18,6 +18,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Window;
 import org.kordamp.ikonli.javafx.FontIcon;
 
+import java.awt.image.BufferedImage;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -105,8 +106,14 @@ public final class MainController {
     }
 
     public void setCurrentUser(UserAccount user, Runnable logoutAction) {
+        setCurrentUser(user, logoutAction, null, 0);
+    }
+
+    public void setCurrentUser(UserAccount user, Runnable logoutAction,
+                               BufferedImage preloadedAvatar, int preloadedPixelSize) {
         this.logoutAction = logoutAction;
-        accountController.setCurrentUser(user, this::logout);
+        accountController.setCurrentUser(
+                user, this::logout, preloadedAvatar, preloadedPixelSize);
         loadingWorkspace = true;
         setSaveStatus("Caricamento dati…");
         workspaceService.openAsync(user).whenComplete((snapshot, failure) -> Platform.runLater(() -> {

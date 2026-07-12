@@ -1,9 +1,11 @@
 package com.crm.service;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -60,11 +62,28 @@ class AvatarServiceTest {
         assertNotNull(twoX);
         assertEquals(56, (int) oneX.getWidth());
         assertEquals(112, (int) twoX.getWidth());
+        BufferedImage cachedRendition = service.loadAvatarRendition(user, 112);
+        assertSame(cachedRendition, service.loadAvatarRendition(user, 112));
+        Path diskCache = firstAvatar.resolveSibling(
+                firstAvatar.getFileName() + ".112.rendition.png");
+        assertTrue(java.nio.file.Files.isRegularFile(diskCache));
+
+        AvatarService restartedService = new AvatarService(repository, avatarDirectory, processor);
+        BufferedImage restoredRendition = restartedService.loadAvatarRendition(user, 112);
+        assertNotNull(restoredRendition);
+        assertArrayEquals(
+                cachedRendition.getRGB(0, 0, 112, 112, null, 0, 112),
+                restoredRendition.getRGB(0, 0, 112, 112, null, 0, 112));
+        assertNotNull(restartedService.loadAvatarRendition(user, 70));
+        try (var files = java.nio.file.Files.list(avatarDirectory)) {
+            assertEquals(3, files.filter(path -> !path.getFileName().toString().endsWith(".tmp")).count());
+        }
 
         service.updateAvatar(user, source, new CropSelection(300, 300, 1));
 
         assertNotEquals(firstFileName, user.getAvatarFileName());
         assertFalse(java.nio.file.Files.exists(firstAvatar));
+        assertFalse(java.nio.file.Files.exists(diskCache));
         assertEquals(2, repository.saveCount);
     }
 

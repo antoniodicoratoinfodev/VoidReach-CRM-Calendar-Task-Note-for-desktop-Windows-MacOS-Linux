@@ -53,6 +53,8 @@ public final class AccountController {
     private UserAccount currentUser;
     private Runnable logoutAction;
     private long avatarLoadVersion;
+    private String displayedAvatarFileName;
+    private int displayedAvatarPixelSize;
 
     public AccountController(Label currentUserLabel, Button accountMenuButton,
                              FontIcon defaultAvatarIcon, ImageView avatarImage,
@@ -69,11 +71,25 @@ public final class AccountController {
     }
 
     public void setCurrentUser(UserAccount user, Runnable logoutAction) {
+        setCurrentUser(user, logoutAction, null, 0);
+    }
+
+    public void setCurrentUser(UserAccount user, Runnable logoutAction,
+                               BufferedImage preloadedAvatar, int preloadedPixelSize) {
         currentUser = Objects.requireNonNull(user);
         this.logoutAction = logoutAction;
         currentUserLabel.setText(user.getFullName());
-        refreshAvatar();
+        displayedAvatarFileName = null;
+        displayedAvatarPixelSize = 0;
+        if (preloadedAvatar != null && preloadedPixelSize > 0) {
+            applyAvatarImage(SwingFXUtils.toFXImage(preloadedAvatar, null));
+            displayedAvatarFileName = user.getAvatarFileName();
+            displayedAvatarPixelSize = preloadedPixelSize;
+        } else {
+            applyAvatarImage(null);
+        }
         javafx.application.Platform.runLater(() -> {
+            if (currentUser != user) return;
             installAvatarScaleTracking();
             refreshAvatar();
         });
@@ -228,6 +244,8 @@ public final class AccountController {
         UserAccount user = currentUser;
         if (user == null) return;
         int pixelSize = navbarAvatarPixelSize();
+        if (Objects.equals(displayedAvatarFileName, user.getAvatarFileName())
+                && displayedAvatarPixelSize == pixelSize && avatarImage.isVisible()) return;
         long requestVersion = ++avatarLoadVersion;
         javafx.concurrent.Task<BufferedImage> task = new javafx.concurrent.Task<>() {
             @Override protected BufferedImage call() { return avatarService.loadAvatarRendition(user, pixelSize); }
@@ -237,9 +255,15 @@ public final class AccountController {
             BufferedImage rendition = task.getValue();
             Image image = rendition == null ? null : SwingFXUtils.toFXImage(rendition, null);
             applyAvatarImage(image);
+            displayedAvatarFileName = image == null ? null : user.getAvatarFileName();
+            displayedAvatarPixelSize = image == null ? 0 : pixelSize;
         });
         task.setOnFailed(event -> {
-            if (currentUser == user && requestVersion == avatarLoadVersion) applyAvatarImage(null);
+            if (currentUser == user && requestVersion == avatarLoadVersion) {
+                applyAvatarImage(null);
+                displayedAvatarFileName = null;
+                displayedAvatarPixelSize = 0;
+            }
         });
         Thread worker = new Thread(task, "avatar-load-worker");
         worker.setDaemon(true);

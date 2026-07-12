@@ -65,6 +65,7 @@ Data is stored in the `.voidreach-crm` directory inside the user's home director
 ├── data/<account-id>.properties             # contacts, tasks, and calendar preferences
 ├── data/<account-id>.properties.bak         # atomic backup of the data file
 ├── avatars/<account-id>-<uuid>.png          # cropped avatar saved as PNG
+├── avatars/<account-id>-<uuid>.png.<size>.rendition.png # up to 2 disposable display caches
 └── backup/<account-id>/                     # automatic CRM data backups
     └── crm-data-<timestamp>.properties      # up to 3 copies are retained
 ```
@@ -72,6 +73,7 @@ Data is stored in the `.voidreach-crm` directory inside the user's home director
 Primary saves are atomic. If a file is corrupted, the application attempts to recover the previous `.bak` revision. Unreadable records are isolated in files with the `.corrupt.properties` suffix so that the remaining valid data can still be loaded when possible.
 
 Avatars support PNG and JPG/JPEG images ranging from 300×300 to 20,000×20,000 pixels, with a maximum file size of 10 MB. Images are processed with bounded memory usage and saved as a PNG master image of up to 1024×1024 pixels.
+The startup splash preloads the remembered account's navbar avatar. Each avatar keeps one authoritative master and no more than two lossless display renditions, for a maximum of three stored image files.
 
 ## Requirements
 

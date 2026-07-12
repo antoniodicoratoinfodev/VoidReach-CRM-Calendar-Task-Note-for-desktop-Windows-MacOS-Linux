@@ -5,6 +5,8 @@ import com.crm.controller.LoginController;
 import com.crm.controller.MainController;
 import com.crm.model.UserAccount;
 import com.crm.repository.LocalUserRepository;
+import com.crm.service.AvatarService;
+import com.crm.service.AvatarService.PreloadedAvatars;
 import com.crm.service.SessionService;
 
 import javafx.application.Application;
@@ -18,6 +20,7 @@ import javafx.scene.control.ButtonBar;
 import javafx.scene.control.ButtonType;
 import javafx.scene.image.Image;
 import javafx.scene.paint.Color;
+import javafx.stage.Screen;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 
@@ -36,6 +39,7 @@ public class Main extends Application {
     private LoginController loginController;
     private MainController rememberedAppController;
     private UserAccount rememberedUser;
+    private PreloadedAvatars rememberedAvatars;
     private final SessionService sessionService = new SessionService(new LocalUserRepository());
 
     @Override
@@ -68,9 +72,9 @@ public class Main extends Application {
     }
 
     private void startLoadingTask() {
-        Task<UserAccount> loadTask = new Task<>() {
+        Task<StartupData> loadTask = new Task<>() {
             @Override
-            protected UserAccount call() throws Exception {
+            protected StartupData call() throws Exception {
                 // 1. Core Initialization
                 updateMessage("Core Initialization...");
                 updateProgress(0.1, 1.0);
@@ -80,7 +84,13 @@ public class Main extends Application {
                 updateMessage("Checking saved session...");
                 updateProgress(0.3, 1.0);
                 UserAccount savedUser = sessionService.getRememberedUser().orElse(null);
-                if (savedUser != null) updateMessage("Loading your workspace...");
+                PreloadedAvatars avatars = null;
+                if (savedUser != null) {
+                    updateMessage("Loading profile image...");
+                    avatars = new AvatarService(new LocalUserRepository())
+                            .preloadCommonRenditions(savedUser);
+                    updateMessage("Loading your workspace...");
+                }
                 updateProgress(0.6, 1.0);
                 Thread.sleep(300);
 
@@ -94,7 +104,7 @@ public class Main extends Application {
                 updateProgress(1.0, 1.0);
                 Thread.sleep(300);
 
-                return savedUser;
+                return new StartupData(savedUser, avatars);
             }
         };
 
@@ -103,7 +113,9 @@ public class Main extends Application {
 
         loadTask.setOnSucceeded(e -> {
             try {
-                rememberedUser = loadTask.getValue();
+                StartupData startupData = loadTask.getValue();
+                rememberedUser = startupData.user();
+                rememberedAvatars = startupData.avatars();
                 loadLoginView();
                 if (rememberedUser != null) loadAndShowRememberedApp();
                 else transitionToLogin();
@@ -156,12 +168,23 @@ public class Main extends Application {
         if (root == null || rememberedAppController == null) return;
         mainStage.setTitle("VoidReach CRM");
         addAppIcon(mainStage);
-        rememberedAppController.setCurrentUser(rememberedUser, this::logout);
         Scene scene = new Scene(root);
         scene.setFill(Color.web("#0f172a"));
         scene.getStylesheets().add(getClass().getResource("/css/style-dark.css").toExternalForm());
         mainStage.setScene(scene);
         mainStage.setMaximized(true);
+        Screen startupScreen = Screen.getPrimary();
+        int targetPixelSize = (int) Math.ceil(56 * Math.max(
+                startupScreen.getOutputScaleX(), startupScreen.getOutputScaleY()));
+        if (rememberedAvatars == null) {
+            rememberedAppController.setCurrentUser(rememberedUser, this::logout);
+        } else {
+            rememberedAppController.setCurrentUser(
+                    rememberedUser, this::logout,
+                    rememberedAvatars.closestTo(targetPixelSize),
+                    rememberedAvatars.closestSizeTo(targetPixelSize));
+            rememberedAvatars = null;
+        }
         showMainStage(rememberedAppController::requestInitialFocus);
     }
 
@@ -305,6 +328,8 @@ public class Main extends Application {
     public static void main(String[] args) {
         launch(args);
     }
+
+    private record StartupData(UserAccount user, PreloadedAvatars avatars) {}
 
     private void addAppIcon(Stage stage) {
         if (stage == null || stage.getIcons().isEmpty()) {
