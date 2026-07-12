@@ -130,9 +130,12 @@ The Notes section provides a per-account knowledge workspace.
 - Create nested folders by using **Add folder** while another folder is open.
 - Navigate the complete clickable breadcrumb path, such as **Home › Projects › Client A**.
 - Drop a note onto any breadcrumb segment to move it directly to that location.
+- The breadcrumb segment currently under the pointer is highlighted during a drag, making the destination name clear before dropping.
+- The breadcrumb bar scrolls long paths and automatically keeps the current location visible.
+- Dropping on **Home** moves the note to **All notes**; dropping on a folder name moves it into that folder.
 - Drag a complete note card onto a folder to move it there.
-- Move a note between folders, or back to **All notes**, from the folder selector in the editor.
-- Rename folders or delete them; deleting a folder safely moves its notes back to **All notes**.
+- Move a note between folders, or back to **All notes**, from the editor's folder selector, which displays each folder's complete breadcrumb path.
+- Rename folders or delete them; deleting a folder safely moves its notes and subfolders to the deleted folder's parent location.
 - Choose Plain text (`.txt`) or Markdown (`.md`) when creating a note.
 - Search by title or content.
 - Reorder note cards with drag and drop.
