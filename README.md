@@ -137,6 +137,8 @@ The Notes section provides a per-account knowledge workspace.
 - The breadcrumb bar scrolls long paths and automatically keeps the current location visible.
 - Dropping on **Home** moves the note to **All notes**; dropping on a folder name moves it into that folder.
 - Drag a complete note card onto a folder to move it there.
+- Drag a folder card onto another folder to move the complete folder tree, or drop it on a breadcrumb to move it to an ancestor location.
+- Invalid folder moves that would create a cycle, target the same location, or duplicate a sibling folder name are rejected.
 - Move a note between folders, or back to **All notes**, from the editor's folder selector, which displays each folder's complete breadcrumb path.
 - Rename folders or delete them; deleting a folder safely moves its notes and subfolders to the deleted folder's parent location.
 - Choose Plain text (`.txt`) or Markdown (`.md`) when creating a note.

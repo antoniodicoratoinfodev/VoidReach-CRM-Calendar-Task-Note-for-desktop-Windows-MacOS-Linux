@@ -1222,6 +1222,7 @@
     -fx-cursor: hand;
 }
 .note-folder-card:hover { -fx-background-color: #211d19; -fx-border-color: #f59e0b; }
+.note-folder-card-dragging { -fx-opacity: 0.55; }
 .note-folder-drop-target { -fx-border-color: #fbbf24; -fx-border-width: 2; -fx-background-color: #3a2a13; }
 .note-folder-title { -fx-text-fill: #f1f5f9; -fx-font-size: 15px; -fx-font-weight: 800; }
 .note-folder-count { -fx-text-fill: #94a3b8; -fx-font-size: 11px; }

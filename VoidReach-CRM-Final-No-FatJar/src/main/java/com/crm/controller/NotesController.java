@@ -46,6 +46,7 @@ import java.util.regex.Pattern;
 /** Owns the notes library, full-size editor, ordering, Markdown preview, and task links. */
 public final class NotesController {
     private static final DataFormat NOTE_ID = new DataFormat("application/x-voidreach-note-id");
+    private static final DataFormat FOLDER_ID = new DataFormat("application/x-voidreach-folder-id");
     private static final FolderOption ROOT_FOLDER = new FolderOption(null, "All notes");
     private static final List<Double> FONT_SIZES = List.of(
             12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 28.0, 32.0, 36.0, 40.0, 48.0);
@@ -512,34 +513,52 @@ public final class NotesController {
         menu.getStyleClass().addAll("icon-button", "note-folder-menu");
         menu.setGraphic(new FontIcon("fas-ellipsis-v"));
         menu.setOnMouseClicked(event -> event.consume());
+        menu.setOnDragDetected(event -> event.consume());
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox header = new HBox(8, icon, spacer, menu);
+        FontIcon drag = new FontIcon("fas-grip-vertical");
+        drag.setIconSize(12);
+        drag.getStyleClass().add("note-drag-handle");
+        HBox header = new HBox(8, icon, spacer, drag, menu);
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox card = new VBox(9, header, title, count, containedNotesScroll);
         card.getStyleClass().add("note-folder-card");
         card.setPrefWidth(250);
         card.setOnMouseClicked(event -> openFolder(folder));
+        card.setOnDragDetected(event -> {
+            SnapshotParameters snapshotParameters = new SnapshotParameters();
+            snapshotParameters.setFill(Color.TRANSPARENT);
+            var dragImage = card.snapshot(snapshotParameters, null);
+            Dragboard board = card.startDragAndDrop(TransferMode.MOVE);
+            ClipboardContent content = new ClipboardContent();
+            content.put(FOLDER_ID, folder.getId());
+            board.setContent(content);
+            board.setDragView(dragImage,
+                    Math.max(0, Math.min(event.getX(), dragImage.getWidth())),
+                    Math.max(0, Math.min(event.getY(), dragImage.getHeight())));
+            card.getStyleClass().add("note-folder-card-dragging");
+            event.consume();
+        });
+        card.setOnDragDone(event -> {
+            card.getStyleClass().remove("note-folder-card-dragging");
+            clearBreadcrumbDropTarget();
+        });
         card.setOnDragEntered(event -> {
-            if (event.getDragboard().hasContent(NOTE_ID)) card.getStyleClass().add("note-folder-drop-target");
+            if (event.getGestureSource() != card && canAcceptDrop(event.getDragboard(), folder.getId())) {
+                card.getStyleClass().add("note-folder-drop-target");
+            }
         });
         card.setOnDragExited(event -> card.getStyleClass().remove("note-folder-drop-target"));
         card.setOnDragOver(event -> {
-            if (event.getDragboard().hasContent(NOTE_ID)) event.acceptTransferModes(TransferMode.MOVE);
+            if (event.getGestureSource() != card && canAcceptDrop(event.getDragboard(), folder.getId())) {
+                event.acceptTransferModes(TransferMode.MOVE);
+            }
             event.consume();
         });
         card.setOnDragDropped(event -> {
             card.getStyleClass().remove("note-folder-drop-target");
-            Object draggedId = event.getDragboard().getContent(NOTE_ID);
-            Note dragged = notes.stream().filter(note -> note.getId().equals(draggedId)).findFirst().orElse(null);
-            if (dragged == null) {
-                event.setDropCompleted(false);
-                return;
-            }
-            dragged.setFolderId(folder.getId());
-            changed();
-            event.setDropCompleted(true);
+            event.setDropCompleted(moveDroppedItem(event.getDragboard(), folder.getId()));
             event.consume();
         });
         return card;
@@ -649,29 +668,91 @@ public final class NotesController {
         segment.getStyleClass().add("note-breadcrumb-segment");
         segment.setOnAction(event -> navigateToFolder(folderId));
         segment.setOnDragOver(event -> {
-            if (event.getDragboard().hasContent(NOTE_ID)) event.acceptTransferModes(TransferMode.MOVE);
+            if (canAcceptDrop(event.getDragboard(), folderId)) {
+                event.acceptTransferModes(TransferMode.MOVE);
+            }
             event.consume();
         });
         segment.setOnDragEntered(event -> {
-            if (event.getDragboard().hasContent(NOTE_ID)) {
+            if (canAcceptDrop(event.getDragboard(), folderId)) {
                 showBreadcrumbDropTarget(segment);
             }
         });
         segment.setOnDragExited(event -> segment.getStyleClass().remove("note-breadcrumb-drop-target"));
         segment.setOnDragDropped(event -> {
             clearBreadcrumbDropTarget();
-            Object draggedId = event.getDragboard().getContent(NOTE_ID);
-            Note dragged = notes.stream().filter(note -> note.getId().equals(draggedId)).findFirst().orElse(null);
-            if (dragged == null) {
-                event.setDropCompleted(false);
-                return;
-            }
-            dragged.setFolderId(folderId);
-            changed();
-            event.setDropCompleted(true);
+            event.setDropCompleted(moveDroppedItem(event.getDragboard(), folderId));
             event.consume();
         });
         breadcrumbItems.getChildren().add(segment);
+    }
+
+    private boolean canAcceptDrop(Dragboard board, String destinationFolderId) {
+        if (board.hasContent(NOTE_ID)) {
+            Object draggedId = board.getContent(NOTE_ID);
+            return notes.stream().anyMatch(note -> note.getId().equals(draggedId));
+        }
+        if (!board.hasContent(FOLDER_ID)) return false;
+        Object draggedId = board.getContent(FOLDER_ID);
+        NoteFolder dragged = folders.stream()
+                .filter(folder -> folder.getId().equals(draggedId)).findFirst().orElse(null);
+        return canMoveFolder(dragged, destinationFolderId, folders);
+    }
+
+    private boolean moveDroppedItem(Dragboard board, String destinationFolderId) {
+        if (board.hasContent(NOTE_ID)) {
+            Object draggedId = board.getContent(NOTE_ID);
+            Note dragged = notes.stream()
+                    .filter(note -> note.getId().equals(draggedId)).findFirst().orElse(null);
+            if (dragged == null) return false;
+            dragged.setFolderId(destinationFolderId);
+            changed();
+            return true;
+        }
+        if (!board.hasContent(FOLDER_ID)) return false;
+        Object draggedId = board.getContent(FOLDER_ID);
+        NoteFolder dragged = folders.stream()
+                .filter(folder -> folder.getId().equals(draggedId)).findFirst().orElse(null);
+        if (!canMoveFolder(dragged, destinationFolderId, folders)) return false;
+        dragged.setParentFolderId(destinationFolderId);
+        changed();
+        return true;
+    }
+
+    static boolean canMoveFolder(NoteFolder dragged, String destinationFolderId,
+                                 List<NoteFolder> availableFolders) {
+        if (dragged == null || availableFolders == null || !availableFolders.contains(dragged)) return false;
+        String destination = normalizedFolderId(destinationFolderId);
+        if (destination.equals(dragged.getId())) return false;
+        if (!destination.isBlank() && findFolder(destination, availableFolders).isEmpty()) return false;
+        if (resolvedParentId(dragged, availableFolders).equals(destination)) return false;
+
+        String cursor = destination;
+        int guard = availableFolders.size() + 1;
+        while (!cursor.isBlank() && guard-- > 0) {
+            if (cursor.equals(dragged.getId())) return false;
+            NoteFolder ancestor = findFolder(cursor, availableFolders).orElse(null);
+            if (ancestor == null) return false;
+            cursor = resolvedParentId(ancestor, availableFolders);
+        }
+        if (!cursor.isBlank()) return false;
+
+        return availableFolders.stream().noneMatch(candidate -> candidate != dragged
+                && resolvedParentId(candidate, availableFolders).equals(destination)
+                && candidate.getName().equalsIgnoreCase(dragged.getName()));
+    }
+
+    private static Optional<NoteFolder> findFolder(String folderId, List<NoteFolder> availableFolders) {
+        return availableFolders.stream().filter(folder -> folder.getId().equals(folderId)).findFirst();
+    }
+
+    private static String resolvedParentId(NoteFolder folder, List<NoteFolder> availableFolders) {
+        String parentId = normalizedFolderId(folder.getParentFolderId());
+        return findFolder(parentId, availableFolders).isPresent() ? parentId : "";
+    }
+
+    private static String normalizedFolderId(String folderId) {
+        return folderId == null ? "" : folderId.trim();
     }
 
     private void showBreadcrumbDropTarget(Button target) {
