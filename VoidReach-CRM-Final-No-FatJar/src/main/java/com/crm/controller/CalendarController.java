@@ -447,11 +447,11 @@ public final class CalendarController {
                                   double topInset) {
         GraphicsContext graphics = canvas.getGraphicsContext2D();
         Color hourColor = Color.web(themeService.isBlueGrayTheme() ? "#43516a"
-                : themeService.isDarkMode() ? "#2a3a52" : "#dbe2ea");
+                : themeService.isDarkMode() ? "#2a3a52" : "#68727d");
         Color intervalColor = Color.web(themeService.isBlueGrayTheme() ? "#2e3b52"
-                : themeService.isDarkMode() ? "#18243a" : "#edf1f5");
+                : themeService.isDarkMode() ? "#18243a" : "#87919b");
         Color weekDivider = Color.web(themeService.isBlueGrayTheme() ? "#3a4961"
-                : themeService.isDarkMode() ? "#263449" : "#e5eaf1");
+                : themeService.isDarkMode() ? "#263449" : "#68727d");
         graphics.setLineWidth(1);
         for (int hour = 0; hour <= 24; hour++) {
             double hourY = topInset + hour * hourHeight;
@@ -464,7 +464,10 @@ public final class CalendarController {
             graphics.setStroke(intervalColor);
             for (int subdivision = 1; subdivision < subdivisions; subdivision++) {
                 double y = hourY + subdivision * interval * minuteHeight;
-                graphics.setGlobalAlpha(zoom > 1.5 && subdivision % 5 != 0 ? 0.3 : 1);
+                boolean minorZoomLine = zoom > 1.5 && subdivision % 5 != 0;
+                double alpha = themeService.isDarkMode() ? (minorZoomLine ? 0.3 : 1)
+                        : (minorZoomLine ? 0.2 : 0.55);
+                graphics.setGlobalAlpha(alpha);
                 graphics.strokeLine(0, y, width, y);
             }
         }
