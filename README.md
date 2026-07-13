@@ -2,7 +2,9 @@
 
 VoidReach is a local-first desktop CRM workspace built with Java 26 and JavaFX 26. It brings account management, contacts, calendar planning, task control, dashboards, and linked TXT/Markdown notes into one native application.
 
-All workspace data is stored locally and separated by account. The application does not require a remote server, database installation, or JavaFX SDK installation.
+Workspace data is persisted locally and separated by account, with automatic recovery and backup support. Local storage is the current source of truth, allowing the application to operate independently while keeping each user's data available on the device.
+
+The project is designed to support a future online service that can make workspace data available across devices and provide a controlled migration path from local files to cloud-backed storage. This cloud capability is part of the planned roadmap and is not yet enabled in the current local-first build.
 
 ## Current Status
 
@@ -177,6 +179,8 @@ Markdown notes use a RichTextFX `CodeArea`, so the text, syntax colors, selectio
 
 #### Live Code Highlighting
 
+Code can be written directly in the note editor and displayed with IDE-style semantic syntax highlighting while you type, making keywords, types, variables, functions, literals, comments, and operators visually distinct.
+
 Code inside backticks or fenced blocks is highlighted while editing and in Preview. The lightweight multilingual lexer distinguishes common:
 
 - Keywords
@@ -298,7 +302,7 @@ Workspace files and automatic backups are local files and are not encrypted. Pro
 - Apache Maven 3.9 or newer.
 - macOS, Windows, or Linux with JavaFX support.
 
-Maven resolves JavaFX 26.0.1, RichTextFX 0.11.7, Ikonli, and image-processing dependencies. A separate JavaFX SDK installation is not required.
+Maven resolves JavaFX 26.0.1, RichTextFX 0.11.7, Ikonli, and image-processing dependencies.
 
 Confirm that Maven uses the correct JDK:
 
@@ -387,7 +391,6 @@ Platform icons are located at:
 VoidReach-CRM-Calendar-Task/
 ├── README.md
 ├── LICENSE
-├── sample/
 └── VoidReach-CRM-Final-No-FatJar/
     ├── pom.xml
     ├── run.sh
@@ -409,12 +412,6 @@ VoidReach-CRM-Calendar-Task/
         │       └── images/                 # application graphics
         └── test/java/com/crm/              # unit and integration tests
 ```
-
-## Screenshots
-
-| macOS | Windows |
-|---|---|
-| ![VoidReach on macOS](sample/voidreachmac.png) | ![VoidReach on Windows](sample/voidreachwindows.png) |
 
 ## License
 
