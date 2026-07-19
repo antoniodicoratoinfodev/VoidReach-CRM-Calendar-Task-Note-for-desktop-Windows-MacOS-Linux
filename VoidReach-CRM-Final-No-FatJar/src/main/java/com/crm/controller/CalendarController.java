@@ -52,7 +52,7 @@ public final class CalendarController {
     private static final double MIN_ZOOM = 0.75;
     private static final double MAX_ZOOM = 3.0;
     private static final double DEFAULT_ZOOM = 1.0;
-    private static final double TIME_COLUMN_WIDTH = 65.0;
+    private static final double DEFAULT_TIME_COLUMN_WIDTH = 72.0;
     private static final double MIN_TIMELINE_WIDTH = 320.0;
     private static final double TIMELINE_TOP_SPACER_HEIGHT = 12.0;
     private static final double WEEK_HEADER_HEIGHT = 36.0;
@@ -411,7 +411,14 @@ public final class CalendarController {
         double viewportWidth = scrollPane.getViewportBounds().getWidth();
         if (viewportWidth <= 0) viewportWidth = scrollPane.getWidth();
         if (viewportWidth <= 0) return 1000;
-        return Math.max(MIN_TIMELINE_WIDTH, viewportWidth - TIME_COLUMN_WIDTH);
+        double timeColumnWidth = timeLabelsContainer.getWidth();
+        if (timeColumnWidth <= 0) timeColumnWidth = timeLabelsContainer.getPrefWidth();
+        if (timeColumnWidth <= 0) timeColumnWidth = DEFAULT_TIME_COLUMN_WIDTH;
+        return timelineWidthFor(viewportWidth, timeColumnWidth);
+    }
+
+    static double timelineWidthFor(double viewportWidth, double timeColumnWidth) {
+        return Math.max(MIN_TIMELINE_WIDTH, viewportWidth - timeColumnWidth);
     }
 
     private double timelineTopInset() {
@@ -608,7 +615,7 @@ public final class CalendarController {
         double dayWidth = width * widthPercent;
         AnchorPane.setLeftAnchor(box, dayOffset * dayWidth + margin);
         AnchorPane.setTopAnchor(box, topInset + task.getStartMin() * minuteHeight);
-        box.setPrefWidth(dayWidth - margin * 2);
+        setTaskWidth(box, taskEntryWidth(dayWidth, margin));
         setTaskHeight(box, task.getDuration() * minuteHeight);
         Rectangle taskClip = new Rectangle();
         taskClip.widthProperty().bind(box.widthProperty());
@@ -726,6 +733,21 @@ public final class CalendarController {
         if (noteLinks != null) box.getChildren().add(noteLinks);
         box.getChildren().addAll(spacer, resizer);
         timelineArea.getChildren().add(box);
+    }
+
+    /**
+     * A task must stay inside its day column even when a title, time, or linked-note button has a
+     * larger computed minimum width. A preferred width alone is not a constraint in JavaFX.
+     */
+    private void setTaskWidth(Region taskBox, double width) {
+        double exactWidth = Math.max(0, width);
+        taskBox.setMinWidth(exactWidth);
+        taskBox.setPrefWidth(exactWidth);
+        taskBox.setMaxWidth(exactWidth);
+    }
+
+    static double taskEntryWidth(double dayWidth, double margin) {
+        return Math.max(0, dayWidth - margin * 2);
     }
 
     /**
