@@ -194,7 +194,8 @@ Dashboard values update whenever contacts or tasks change.
 - Edit title, date, start time, end time, color, and description.
 - Move tasks vertically to change their time.
 - Move tasks horizontally between days in Week view.
-- Resize a task from its lower edge.
+- Resize a task from its lower edge. The lower-edge grab area remains easy to target for short tasks and provides visual resize feedback.
+- Releasing a resize updates the task end time and duration immediately across Calendar, Tasks, the agenda, and saved workspace data.
 - Delete a selected task with the keyboard or from the task dialog.
 - Marked-complete tasks are visually distinguished.
 - Available colors: Blue, Red, Green, Yellow, Orange, and Purple.
@@ -204,6 +205,7 @@ Dashboard values update whenever contacts or tasks change.
 - `Ctrl`/`Cmd` + mouse wheel zooms while the pointer is over the calendar; clicking the scrollbar first is not required.
 - `Ctrl+0`/`Cmd+0` restores 100% zoom while the pointer is over the calendar.
 - Selected date, Day/Week mode, and zoom level are restored from the saved workspace.
+- Short calendar tasks keep a compact, proportionally scaled title; hovering any task always reveals its complete title in a tooltip.
 
 Calendar entries display the title of every linked note directly inside the task. Selecting a title opens that specific note's editor in the Notes section; long titles are shortened visually and remain available in a tooltip. Linked notes are also available in the agenda and task-edit dialog.
 Renaming, linking, unlinking, or deleting a note refreshes its Calendar and agenda references automatically without changing the selected date or calendar view.
