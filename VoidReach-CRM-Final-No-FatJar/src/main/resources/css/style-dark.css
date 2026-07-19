@@ -755,6 +755,14 @@
     -fx-border-width: 0;
     -fx-padding: 22 14 18 14;
 }
+.sidebar-resize-handle {
+    -fx-background-color: rgba(148,163,184,0.12);
+    -fx-cursor: h-resize;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:pressed {
+    -fx-background-color: rgba(96,165,250,0.65);
+}
 .brand-lockup { -fx-padding: 0 8 26 8; }
 .brand-mark {
     -fx-min-width: 36; -fx-pref-width: 36; -fx-min-height: 36; -fx-pref-height: 36;
@@ -931,6 +939,13 @@
 .calendar-hint { -fx-text-fill: #64748b; -fx-font-size: 11px; }
 .segmented-navigation { -fx-background-color: #0b1324; -fx-background-radius: 8; -fx-padding: 2; }
 .segment-button { -fx-min-width: 32; -fx-pref-width: 32; -fx-min-height: 32; -fx-pref-height: 32; }
+.calendar-zoom-controls { -fx-padding: 2; }
+.calendar-zoom-button { -fx-font-size: 17px; -fx-font-weight: 700; }
+.calendar-zoom-reset { -fx-min-width: 30; -fx-pref-width: 30; }
+.calendar-zoom-value {
+    -fx-min-width: 46; -fx-pref-width: 46;
+    -fx-text-fill: #94a3b8; -fx-font-size: 10px; -fx-font-weight: 800;
+}
 .calendar-surface {
     -fx-background-color: #111827; -fx-background-radius: 14;
     -fx-border-color: #263449; -fx-border-radius: 14; -fx-border-width: 1; -fx-padding: 1;
@@ -1006,7 +1021,8 @@
 .mini-month-title { -fx-text-fill: #e2e8f0; -fx-font-size: 12px; -fx-font-weight: 800; }
 .mini-nav-button { -fx-min-width: 28; -fx-pref-width: 28; -fx-min-height: 28; -fx-pref-height: 28; }
 .calendar-day {
-    -fx-min-width: 29; -fx-pref-width: 29; -fx-min-height: 29; -fx-pref-height: 29;
+    -fx-min-width: 24; -fx-pref-width: 29; -fx-max-width: 29;
+    -fx-min-height: 24; -fx-pref-height: 29; -fx-max-height: 29;
     -fx-background-color: transparent; -fx-background-radius: 15;
     -fx-text-fill: #94a3b8; -fx-font-size: 10px; -fx-padding: 0;
 }

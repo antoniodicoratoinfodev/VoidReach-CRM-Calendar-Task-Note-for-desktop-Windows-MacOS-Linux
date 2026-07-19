@@ -14,6 +14,9 @@
 .sidebar {
     -fx-background-color: #0e1930;
 }
+.sidebar-resize-handle { -fx-background-color: rgba(129,144,168,0.18); }
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle:pressed { -fx-background-color: rgba(63,130,237,0.72); }
 .nav-separator .line { -fx-border-color: #2d3b52; }
 .sidebar-button { -fx-text-fill: #c7d0df; }
 .nav-icon { -fx-icon-color: #d8deea; }

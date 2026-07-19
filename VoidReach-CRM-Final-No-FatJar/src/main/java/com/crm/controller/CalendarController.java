@@ -20,6 +20,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.ScrollEvent;
+import javafx.scene.input.ZoomEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
@@ -42,6 +43,9 @@ import java.util.Set;
 
 /** Owns calendar state, task editing, timeline rendering, zoom, and the calendar sidebar. */
 public final class CalendarController {
+    private static final int MINI_CALENDAR_COLUMNS = 7;
+    private static final double MINI_CALENDAR_MIN_CELL_SIZE = 24;
+    private static final double MINI_CALENDAR_MAX_CELL_SIZE = 29;
     private static final double MINUTE_HEIGHT = 1.0;
     private static final double HOUR_HEIGHT = 60.0;
     private static final double ZOOM_STEP = 0.1;
@@ -56,10 +60,12 @@ public final class CalendarController {
     private final VBox calendarView;
     private final AnchorPane timeLabelsContainer;
     private final AnchorPane timelineArea;
+    private final HBox calendarContentRow;
     private final ScrollPane scrollPane;
     private final DatePicker datePicker;
     private final ComboBox<String> viewModeCombo;
     private final Label selectedPeriodLabel;
+    private final Label zoomLabel;
     private final Label miniMonthYearLabel;
     private final GridPane miniCalendarGrid;
     private final Label activitiesTitle;
@@ -86,19 +92,22 @@ public final class CalendarController {
     private YearMonth currentMiniMonth;
 
     public CalendarController(VBox calendarView, AnchorPane timeLabelsContainer,
-                              AnchorPane timelineArea, ScrollPane scrollPane,
+                              AnchorPane timelineArea, HBox calendarContentRow, ScrollPane scrollPane,
                               DatePicker datePicker, ComboBox<String> viewModeCombo,
-                              Label selectedPeriodLabel, Label miniMonthYearLabel, GridPane miniCalendarGrid,
+                              Label selectedPeriodLabel, Label zoomLabel,
+                              Label miniMonthYearLabel, GridPane miniCalendarGrid,
                               Label activitiesTitle, VBox upcomingActivitiesList, ThemeService themeService,
                               DialogService dialogService, Runnable dataChanged,
                               Runnable showCalendar) {
         this.calendarView = Objects.requireNonNull(calendarView);
         this.timeLabelsContainer = Objects.requireNonNull(timeLabelsContainer);
         this.timelineArea = Objects.requireNonNull(timelineArea);
+        this.calendarContentRow = Objects.requireNonNull(calendarContentRow);
         this.scrollPane = Objects.requireNonNull(scrollPane);
         this.datePicker = Objects.requireNonNull(datePicker);
         this.viewModeCombo = Objects.requireNonNull(viewModeCombo);
         this.selectedPeriodLabel = Objects.requireNonNull(selectedPeriodLabel);
+        this.zoomLabel = Objects.requireNonNull(zoomLabel);
         this.miniMonthYearLabel = Objects.requireNonNull(miniMonthYearLabel);
         this.miniCalendarGrid = Objects.requireNonNull(miniCalendarGrid);
         this.activitiesTitle = Objects.requireNonNull(activitiesTitle);
@@ -118,8 +127,11 @@ public final class CalendarController {
             if (newValue != null) refreshForSelectedDate(newValue);
         });
         installCalendarContentClip();
+        miniCalendarGrid.widthProperty().addListener((observable, oldWidth, newWidth) ->
+                resizeMiniCalendarCells());
         setupViewModeCombo();
         setupZoomControls();
+        updateZoomLabel();
         render();
         updateSidebar();
     }
@@ -148,6 +160,7 @@ public final class CalendarController {
             tasksByDate.clear();
             if (source != null) source.forEach((date, tasks) -> tasksByDate.put(date, new ArrayList<>(tasks)));
             zoom = clamp(selectedZoom, MIN_ZOOM, MAX_ZOOM);
+            updateZoomLabel();
             viewMode = "Week".equals(selectedViewMode) ? "Week" : "Day";
             LocalDate date = selectedDate == null ? LocalDate.now() : selectedDate;
             viewModeCombo.setValue(viewMode);
@@ -170,6 +183,10 @@ public final class CalendarController {
     public LocalDate selectedDate() { return datePicker.getValue(); }
     public String viewMode() { return viewMode; }
     public double zoom() { return zoom; }
+
+    public void zoomIn() { handleZoom(true, viewportCenterContentY()); }
+    public void zoomOut() { handleZoom(false, viewportCenterContentY()); }
+    public void resetZoom() { applyZoom(DEFAULT_ZOOM, viewportCenterContentY()); }
 
     public void createTask(LocalDate date) {
         selectDate(date == null ? LocalDate.now() : date);
@@ -268,6 +285,12 @@ public final class CalendarController {
             if (event.getDeltaY() > 0) handleZoom(true, pivot.getY());
             else if (event.getDeltaY() < 0) handleZoom(false, pivot.getY());
         });
+        scrollPane.addEventFilter(ZoomEvent.ZOOM, event -> {
+            if (!calendarView.isVisible() || event.getZoomFactor() <= 0) return;
+            event.consume();
+            Point2D pivot = timelineArea.sceneToLocal(event.getSceneX(), event.getSceneY());
+            applyZoom(clamp(zoom * event.getZoomFactor(), MIN_ZOOM, MAX_ZOOM), pivot.getY());
+        });
         timelineArea.setFocusTraversable(true);
         installShortcutFilterWhenSceneReady();
         calendarView.visibleProperty().addListener((observable, oldValue, visible) -> {
@@ -297,9 +320,21 @@ public final class CalendarController {
 
     private void handleCalendarShortcut(KeyEvent event) {
         if (!calendarView.isVisible() || !calendarView.isHover()) return;
-        if ((event.isControlDown() || event.isMetaDown()) && event.getCode() == KeyCode.DIGIT0) {
-            event.consume();
-            applyZoom(DEFAULT_ZOOM, viewportCenterContentY());
+        if (!event.isControlDown() && !event.isMetaDown()) return;
+        switch (event.getCode()) {
+            case DIGIT0, NUMPAD0 -> {
+                event.consume();
+                resetZoom();
+            }
+            case PLUS, ADD, EQUALS -> {
+                event.consume();
+                zoomIn();
+            }
+            case MINUS, SUBTRACT -> {
+                event.consume();
+                zoomOut();
+            }
+            default -> { }
         }
     }
 
@@ -309,8 +344,9 @@ public final class CalendarController {
     }
 
     private void applyZoom(double target, double pivotContentY) {
+        target = clamp(target, MIN_ZOOM, MAX_ZOOM);
         double oldZoom = zoom;
-        if (oldZoom == target) return;
+        if (Math.abs(oldZoom - target) < 0.0001) return;
         double contentHeight = calendarContentHeight();
         double viewportHeight = scrollPane.getViewportBounds().getHeight();
         double oldScrollY = scrollY(contentHeight, viewportHeight);
@@ -318,10 +354,15 @@ public final class CalendarController {
         double stablePivotContentY = oldScrollY + pivotViewportY;
         double scaleFactor = target / oldZoom;
         zoom = target;
+        updateZoomLabel();
         render();
         scrollPane.setHvalue(0);
         notifyDataChanged();
         Platform.runLater(() -> {
+            calendarContentRow.applyCss();
+            calendarContentRow.layout();
+            scrollPane.applyCss();
+            scrollPane.layout();
             double newScrollableHeight = Math.max(0, calendarContentHeight() - viewportHeight);
             if (newScrollableHeight > 0) {
                 double topInset = timelineTopInset();
@@ -330,6 +371,10 @@ public final class CalendarController {
             } else scrollPane.setVvalue(0);
             scrollPane.setHvalue(0);
         });
+    }
+
+    private void updateZoomLabel() {
+        zoomLabel.setText(Math.round(zoom * 100) + "%");
     }
 
     private double viewportCenterContentY() {
@@ -397,8 +442,9 @@ public final class CalendarController {
         double width = timelineWidth();
         double topInset = timelineTopInset();
         double height = topInset + 24 * zoomedHourHeight + 12;
-        timeLabelsContainer.setPrefHeight(height);
-        timelineArea.setPrefHeight(height);
+        setFixedHeight(timeLabelsContainer, height);
+        setFixedHeight(timelineArea, height);
+        setFixedHeight(calendarContentRow, height);
         timelineArea.setMinWidth(width);
         timelineArea.setPrefWidth(width);
         timelineArea.setMaxWidth(width);
@@ -426,6 +472,14 @@ public final class CalendarController {
         }
         if (viewMode.equals("Day")) renderDayView(zoomedMinuteHeight, topInset);
         else renderWeekView(width, zoomedMinuteHeight, topInset);
+        calendarContentRow.requestLayout();
+        scrollPane.requestLayout();
+    }
+
+    private void setFixedHeight(Region region, double height) {
+        region.setMinHeight(height);
+        region.setPrefHeight(height);
+        region.setMaxHeight(height);
     }
 
     private void addSubHourLabels(int hour, double hourY, double zoomedMinuteHeight) {
@@ -539,7 +593,13 @@ public final class CalendarController {
         AnchorPane.setLeftAnchor(box, dayOffset * dayWidth + margin);
         AnchorPane.setTopAnchor(box, topInset + task.getStartMin() * minuteHeight);
         box.setPrefWidth(dayWidth - margin * 2);
-        box.setPrefHeight(task.getDuration() * minuteHeight);
+        setTaskHeight(box, task.getDuration() * minuteHeight);
+        Rectangle taskClip = new Rectangle();
+        taskClip.widthProperty().bind(box.widthProperty());
+        taskClip.heightProperty().bind(box.heightProperty());
+        taskClip.setArcWidth(8);
+        taskClip.setArcHeight(8);
+        box.setClip(taskClip);
         Label title = new Label(task.getTitle());
         title.getStyleClass().add("task-title");
         Label time = new Label();
@@ -578,7 +638,7 @@ public final class CalendarController {
             int proposed = task.getDuration() + (int) (delta / minuteHeight);
             int maximum = Task.MINUTES_PER_DAY - task.getStartMin();
             task.setDuration(Math.max(Task.MIN_DURATION_MINUTES, Math.min(maximum, proposed)));
-            box.setPrefHeight(task.getDuration() * minuteHeight);
+            setTaskHeight(box, task.getDuration() * minuteHeight);
             updateTimeLabel(time, task.getStartMin(), task.getDuration());
             dragAnchorY = event.getScreenY();
             updateSidebar();
@@ -652,6 +712,17 @@ public final class CalendarController {
         timelineArea.getChildren().add(box);
     }
 
+    /**
+     * A task's visual bounds must match its time range exactly. VBox otherwise derives a larger
+     * minimum height from its labels, padding, and resize handle, especially at low zoom levels.
+     */
+    private void setTaskHeight(Region taskBox, double height) {
+        double exactHeight = Math.max(0, height);
+        taskBox.setMinHeight(exactHeight);
+        taskBox.setPrefHeight(exactHeight);
+        taskBox.setMaxHeight(exactHeight);
+    }
+
     private void updateTimeLabel(Label label, int start, int duration) {
         int end = start + duration;
         label.setText(String.format("%02d:%02d - %02d:%02d", start / 60, start % 60, end / 60, end % 60));
@@ -681,6 +752,7 @@ public final class CalendarController {
             day.setOnAction(event -> { datePicker.setValue(date); showCalendar.run(); });
             miniCalendarGrid.add(day, (index + dayOffset) % 7, (index + dayOffset) / 7 + 1);
         }
+        resizeMiniCalendarCells();
         upcomingActivitiesList.getChildren().clear();
         boolean weekView = "Week".equals(viewMode);
         activitiesTitle.setText(weekView ? "This week's tasks" : "Today's tasks");
@@ -738,6 +810,24 @@ public final class CalendarController {
             });
             upcomingActivitiesList.getChildren().add(item);
         }
+    }
+
+    /** Keeps each mini-calendar day square while adapting the seven columns to the available width. */
+    private void resizeMiniCalendarCells() {
+        double gridWidth = miniCalendarGrid.getWidth();
+        if (gridWidth <= 0) return;
+        double horizontalGaps = miniCalendarGrid.getHgap() * (MINI_CALENDAR_COLUMNS - 1);
+        double cellSize = clamp((gridWidth - horizontalGaps) / MINI_CALENDAR_COLUMNS,
+                MINI_CALENDAR_MIN_CELL_SIZE, MINI_CALENDAR_MAX_CELL_SIZE);
+        miniCalendarGrid.getChildren().stream()
+                .filter(node -> node.getStyleClass().contains("calendar-day"))
+                .filter(Region.class::isInstance)
+                .map(Region.class::cast)
+                .forEach(cell -> {
+                    cell.setMinSize(cellSize, cellSize);
+                    cell.setPrefSize(cellSize, cellSize);
+                    cell.setMaxSize(cellSize, cellSize);
+                });
     }
 
     private void updateSelectedPeriodLabel() {

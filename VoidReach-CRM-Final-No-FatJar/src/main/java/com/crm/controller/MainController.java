@@ -13,16 +13,20 @@ import com.crm.service.ThemeService;
 import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
+import javafx.scene.Cursor;
 import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.PieChart;
 import javafx.scene.control.*;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.TilePane;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
 import org.kordamp.ikonli.javafx.FontIcon;
@@ -46,6 +50,20 @@ import java.util.concurrent.CompletableFuture;
  * event methods referenced by MainView.fxml.</p>
  */
 public final class MainController {
+    private static final double LEFT_SIDEBAR_DEFAULT_WIDTH = 216;
+    private static final double LEFT_SIDEBAR_MIN_WIDTH = 176;
+    private static final double LEFT_SIDEBAR_MAX_WIDTH = 360;
+    private static final double RIGHT_SIDEBAR_DEFAULT_WIDTH = 296;
+    private static final double RIGHT_SIDEBAR_MIN_WIDTH = 260;
+    private static final double RIGHT_SIDEBAR_MAX_WIDTH = 440;
+    private static final double SIDEBAR_COLLAPSE_THRESHOLD = 52;
+    private static final double MIN_WORKSPACE_WIDTH = 520;
+    private static final double RESIZE_HANDLE_WIDTH = 6;
+
+    @FXML private BorderPane appShell;
+    @FXML private HBox leftSidebarWrapper;
+    @FXML private HBox rightSidebarWrapper;
+    @FXML private VBox leftPanel;
     @FXML private TableView<Contact> contactsTable;
     @FXML private TableColumn<Contact, String> nameColumn;
     @FXML private TableColumn<Contact, String> companyColumn;
@@ -76,6 +94,10 @@ public final class MainController {
     @FXML private FontIcon genericIcon;
     @FXML private VBox sidebarContainer;
     @FXML private VBox rightPanel;
+    @FXML private Region leftResizeHandle;
+    @FXML private Region rightResizeHandle;
+    @FXML private Button leftSidebarToggleButton;
+    @FXML private Button agendaToggleButton;
     @FXML private Button themeToggleBtn;
     @FXML private FontIcon themeToggleIcon;
     @FXML private Label currentUserLabel;
@@ -86,10 +108,12 @@ public final class MainController {
 
     @FXML private AnchorPane timeLabelsContainer;
     @FXML private AnchorPane calendarTimelineArea;
+    @FXML private HBox calendarContentRow;
     @FXML private ScrollPane calendarScrollPane;
     @FXML private DatePicker calendarDatePicker;
     @FXML private ComboBox<String> viewModeCombo;
     @FXML private Label selectedPeriodLabel;
+    @FXML private Label calendarZoomLabel;
     @FXML private Label miniMonthYearLabel;
     @FXML private GridPane miniCalendarGrid;
     @FXML private Label activitiesTitle;
@@ -166,11 +190,17 @@ public final class MainController {
     private Runnable logoutAction;
     private UserAccount currentUser;
     private boolean loadingWorkspace;
+    private double leftExpandedWidth = LEFT_SIDEBAR_DEFAULT_WIDTH;
+    private double rightExpandedWidth = RIGHT_SIDEBAR_DEFAULT_WIDTH;
+    private boolean leftAutomaticallyCollapsed;
+    private boolean rightAutomaticallyCollapsed;
+    private boolean adjustingResponsiveSidebars;
 
     @FXML
     public void initialize() {
         themeService = new ThemeService(this::ownerWindow);
         dialogService = new DialogService(themeService);
+        initializeResizableSidebars();
         navigationController = new NavigationController(homeView, dashboardView,
                 contactsView, calendarView, tasksView, notesView, genericView,
                 genericTitle, genericIcon, sidebarContainer);
@@ -188,7 +218,8 @@ public final class MainController {
                 paginationInfoLabel, selectContactsBtn, contactsSortMenu, contactsInlineEditToggle,
                 addFieldBtn, themeService, this::handleDataChanged);
         calendarController = new CalendarController(calendarView, timeLabelsContainer,
-                calendarTimelineArea, calendarScrollPane, calendarDatePicker, viewModeCombo, selectedPeriodLabel,
+                calendarTimelineArea, calendarContentRow, calendarScrollPane, calendarDatePicker,
+                viewModeCombo, selectedPeriodLabel, calendarZoomLabel,
                 miniMonthYearLabel, miniCalendarGrid, activitiesTitle, upcomingActivitiesList, themeService,
                 dialogService, this::handleDataChanged, navigationController::showCalendar);
         notesController = new NotesController(notesLibraryPane, noteEditorPane, notesSearchField,
@@ -458,15 +489,249 @@ public final class MainController {
     @FXML private void handleToday() { calendarController.today(); }
     @FXML private void handlePrevDay() { calendarController.previousPeriod(); }
     @FXML private void handleNextDay() { calendarController.nextPeriod(); }
+    @FXML private void handleCalendarZoomIn() { calendarController.zoomIn(); }
+    @FXML private void handleCalendarZoomOut() { calendarController.zoomOut(); }
+    @FXML private void handleCalendarZoomReset() { calendarController.resetZoom(); }
     @FXML private void handleOpenToday() {
         calendarController.today();
         navigationController.showCalendar();
     }
     @FXML private void handleOpenContacts() { navigationController.showContacts(); }
+    @FXML private void handleToggleNavigation() {
+        setSidebarExpanded(true, !leftSidebarWrapper.isManaged());
+    }
     @FXML private void handleToggleAgenda() {
-        boolean show = !rightPanel.isVisible();
-        rightPanel.setVisible(show);
-        rightPanel.setManaged(show);
+        setSidebarExpanded(false, !rightSidebarWrapper.isManaged());
+    }
+
+    private void initializeResizableSidebars() {
+        setSidebarWidth(leftPanel, leftExpandedWidth);
+        setSidebarWidth(rightPanel, rightExpandedWidth);
+        installResizeBehavior(leftResizeHandle, leftPanel, true);
+        installResizeBehavior(rightResizeHandle, rightPanel, false);
+        appShell.widthProperty().addListener((observable, oldWidth, newWidth) ->
+                handleShellWidthChanged(oldWidth.doubleValue(), newWidth.doubleValue()));
+        updateSidebarToggleAccessibility();
+    }
+
+    private void installResizeBehavior(Region handle, VBox panel, boolean leftSidebar) {
+        SidebarDragState drag = new SidebarDragState();
+        handle.setCursor(Cursor.H_RESIZE);
+        handle.setOnMousePressed(event -> {
+            drag.startScreenX = event.getScreenX();
+            drag.startWidth = panel.getWidth();
+            drag.requestedWidth = drag.startWidth;
+            drag.clip = new Rectangle();
+            drag.clip.widthProperty().bind(panel.widthProperty());
+            drag.clip.heightProperty().bind(panel.heightProperty());
+            panel.setClip(drag.clip);
+            event.consume();
+        });
+        handle.setOnMouseDragged(event -> {
+            double horizontalMovement = event.getScreenX() - drag.startScreenX;
+            drag.requestedWidth = drag.startWidth + (leftSidebar ? horizontalMovement : -horizontalMovement);
+            double previewWidth = clamp(drag.requestedWidth, 0, maximumSidebarWidth(leftSidebar));
+            setSidebarWidth(panel, previewWidth);
+            event.consume();
+        });
+        handle.setOnMouseReleased(event -> {
+            panel.setClip(null);
+            if (drag.clip != null) {
+                drag.clip.widthProperty().unbind();
+                drag.clip.heightProperty().unbind();
+                drag.clip = null;
+            }
+            if (drag.requestedWidth <= SIDEBAR_COLLAPSE_THRESHOLD) {
+                setSidebarExpanded(leftSidebar, false);
+            } else {
+                double settledWidth = clamp(drag.requestedWidth,
+                        minimumSidebarWidth(leftSidebar), maximumSidebarWidth(leftSidebar));
+                rememberExpandedWidth(leftSidebar, settledWidth);
+                setSidebarWidth(panel, settledWidth);
+            }
+            event.consume();
+        });
+        handle.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                setSidebarExpanded(leftSidebar, false);
+                event.consume();
+            }
+        });
+    }
+
+    private void setSidebarExpanded(boolean leftSidebar, boolean expanded) {
+        setSidebarExpanded(leftSidebar, expanded, false);
+        if (expanded) fitSidebarsToWidth(appShell.getWidth(), leftSidebar);
+    }
+
+    private void setSidebarExpanded(boolean leftSidebar, boolean expanded, boolean automatic) {
+        HBox wrapper = leftSidebar ? leftSidebarWrapper : rightSidebarWrapper;
+        VBox panel = leftSidebar ? leftPanel : rightPanel;
+        if (expanded) {
+            double rememberedWidth = leftSidebar ? leftExpandedWidth : rightExpandedWidth;
+            setSidebarWidth(panel, clamp(rememberedWidth,
+                    minimumSidebarWidth(leftSidebar), maximumSidebarWidth(leftSidebar)));
+        }
+        wrapper.setManaged(expanded);
+        wrapper.setVisible(expanded);
+        setAutomaticallyCollapsed(leftSidebar, automatic && !expanded);
+        updateSidebarToggleAccessibility();
+    }
+
+    private void handleShellWidthChanged(double oldWidth, double newWidth) {
+        if (newWidth <= 0 || adjustingResponsiveSidebars) return;
+        if (newWidth < oldWidth) {
+            fitSidebarsToWidth(newWidth, null);
+        } else if (newWidth > oldWidth) {
+            restoreResponsiveSidebars(newWidth);
+        }
+    }
+
+    /** Shrinks panels before hiding them, preserving the central workspace while the window narrows. */
+    private void fitSidebarsToWidth(double shellWidth, Boolean preferredSidebar) {
+        if (shellWidth <= 0 || adjustingResponsiveSidebars) return;
+        adjustingResponsiveSidebars = true;
+        try {
+            boolean first = preferredSidebar == null ? false : !preferredSidebar;
+            boolean second = !first;
+            double deficit = workspaceDeficit(shellWidth);
+            deficit = shrinkSidebar(first, deficit);
+            deficit = shrinkSidebar(second, deficit);
+
+            if (deficit > 0 && sidebarWrapper(first).isManaged()) {
+                setSidebarExpanded(first, false, true);
+                deficit = workspaceDeficit(shellWidth);
+            }
+            if (deficit > 0 && sidebarWrapper(second).isManaged()) {
+                setSidebarExpanded(second, false, true);
+            }
+        } finally {
+            adjustingResponsiveSidebars = false;
+        }
+    }
+
+    /** Reopens only automatically hidden panels and progressively restores the user's chosen widths. */
+    private void restoreResponsiveSidebars(double shellWidth) {
+        if (adjustingResponsiveSidebars) return;
+        adjustingResponsiveSidebars = true;
+        try {
+            restoreAutomaticallyCollapsedSidebar(true, shellWidth);
+            restoreAutomaticallyCollapsedSidebar(false, shellWidth);
+            if (!leftAutomaticallyCollapsed && !rightAutomaticallyCollapsed) {
+                restoreRememberedWidths(shellWidth);
+            }
+        } finally {
+            adjustingResponsiveSidebars = false;
+        }
+    }
+
+    private void restoreAutomaticallyCollapsedSidebar(boolean leftSidebar, double shellWidth) {
+        boolean automaticallyCollapsed = leftSidebar ? leftAutomaticallyCollapsed : rightAutomaticallyCollapsed;
+        if (!automaticallyCollapsed) return;
+        double requiredWidth = minimumSidebarWidth(leftSidebar) + RESIZE_HANDLE_WIDTH;
+        double availableWidth = shellWidth - MIN_WORKSPACE_WIDTH - totalSidebarWidth();
+        if (availableWidth >= requiredWidth) setSidebarExpanded(leftSidebar, true, true);
+    }
+
+    private void restoreRememberedWidths(double shellWidth) {
+        double availableExtra = shellWidth - MIN_WORKSPACE_WIDTH - totalSidebarWidth();
+        if (availableExtra <= 0) return;
+
+        double leftNeed = widthToRestore(true);
+        double rightNeed = widthToRestore(false);
+        double totalNeed = leftNeed + rightNeed;
+        if (totalNeed <= 0) return;
+
+        double usableExtra = Math.min(availableExtra, totalNeed);
+        double leftExtra = usableExtra * leftNeed / totalNeed;
+        double rightExtra = usableExtra - leftExtra;
+        if (leftNeed > 0) setSidebarWidth(leftPanel, leftPanel.getPrefWidth() + leftExtra);
+        if (rightNeed > 0) setSidebarWidth(rightPanel, rightPanel.getPrefWidth() + rightExtra);
+    }
+
+    private double widthToRestore(boolean leftSidebar) {
+        if (!sidebarWrapper(leftSidebar).isManaged()) return 0;
+        double rememberedWidth = leftSidebar ? leftExpandedWidth : rightExpandedWidth;
+        VBox panel = leftSidebar ? leftPanel : rightPanel;
+        return Math.max(0, rememberedWidth - panel.getPrefWidth());
+    }
+
+    private double shrinkSidebar(boolean leftSidebar, double deficit) {
+        if (deficit <= 0 || !sidebarWrapper(leftSidebar).isManaged()) return deficit;
+        VBox panel = leftSidebar ? leftPanel : rightPanel;
+        double currentWidth = panel.getPrefWidth();
+        double reduction = Math.min(deficit, Math.max(0, currentWidth - minimumSidebarWidth(leftSidebar)));
+        if (reduction > 0) setSidebarWidth(panel, currentWidth - reduction);
+        return deficit - reduction;
+    }
+
+    private double workspaceDeficit(double shellWidth) {
+        return Math.max(0, MIN_WORKSPACE_WIDTH + totalSidebarWidth() - shellWidth);
+    }
+
+    private double totalSidebarWidth() {
+        return sidebarWidth(true) + sidebarWidth(false);
+    }
+
+    private double sidebarWidth(boolean leftSidebar) {
+        if (!sidebarWrapper(leftSidebar).isManaged()) return 0;
+        VBox panel = leftSidebar ? leftPanel : rightPanel;
+        return panel.getPrefWidth() + RESIZE_HANDLE_WIDTH;
+    }
+
+    private HBox sidebarWrapper(boolean leftSidebar) {
+        return leftSidebar ? leftSidebarWrapper : rightSidebarWrapper;
+    }
+
+    private void setAutomaticallyCollapsed(boolean leftSidebar, boolean automaticallyCollapsed) {
+        if (leftSidebar) leftAutomaticallyCollapsed = automaticallyCollapsed;
+        else rightAutomaticallyCollapsed = automaticallyCollapsed;
+    }
+
+    private void updateSidebarToggleAccessibility() {
+        updateToggleAccessibility(leftSidebarToggleButton, leftSidebarWrapper.isManaged(), "navigation");
+        updateToggleAccessibility(agendaToggleButton, rightSidebarWrapper.isManaged(), "agenda");
+    }
+
+    private void updateToggleAccessibility(Button button, boolean expanded, String panelName) {
+        String description = (expanded ? "Hide " : "Show ") + panelName;
+        button.setAccessibleText(description);
+        if (button.getTooltip() != null) button.getTooltip().setText(description);
+    }
+
+    private double maximumSidebarWidth(boolean leftSidebar) {
+        double configuredMaximum = leftSidebar ? LEFT_SIDEBAR_MAX_WIDTH : RIGHT_SIDEBAR_MAX_WIDTH;
+        double shellWidth = appShell.getWidth();
+        if (shellWidth <= 0) return configuredMaximum;
+        double otherWidth = sidebarWidth(!leftSidebar);
+        double available = shellWidth - otherWidth - MIN_WORKSPACE_WIDTH - RESIZE_HANDLE_WIDTH;
+        return Math.max(minimumSidebarWidth(leftSidebar), Math.min(configuredMaximum, available));
+    }
+
+    private double minimumSidebarWidth(boolean leftSidebar) {
+        return leftSidebar ? LEFT_SIDEBAR_MIN_WIDTH : RIGHT_SIDEBAR_MIN_WIDTH;
+    }
+
+    private void rememberExpandedWidth(boolean leftSidebar, double width) {
+        if (leftSidebar) leftExpandedWidth = width;
+        else rightExpandedWidth = width;
+    }
+
+    private void setSidebarWidth(VBox panel, double width) {
+        panel.setMinWidth(width);
+        panel.setPrefWidth(width);
+        panel.setMaxWidth(width);
+    }
+
+    private double clamp(double value, double minimum, double maximum) {
+        return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static final class SidebarDragState {
+        private double startScreenX;
+        private double startWidth;
+        private double requestedWidth;
+        private Rectangle clip;
     }
 
     @FXML

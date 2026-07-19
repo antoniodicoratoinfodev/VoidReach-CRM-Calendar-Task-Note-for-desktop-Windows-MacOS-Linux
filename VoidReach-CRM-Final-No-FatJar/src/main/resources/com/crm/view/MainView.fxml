@@ -10,10 +10,11 @@
 <?import org.fxmisc.richtext.CodeArea?>
 <?import org.kordamp.ikonli.javafx.FontIcon?>
 
-<BorderPane xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+<BorderPane fx:id="appShell" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
             fx:controller="com.crm.controller.MainController" styleClass="app-shell">
     <left>
-        <VBox prefWidth="216" minWidth="200" maxWidth="232" styleClass="sidebar">
+        <HBox fx:id="leftSidebarWrapper">
+        <VBox fx:id="leftPanel" prefWidth="216" minWidth="216" maxWidth="216" styleClass="sidebar">
             <HBox alignment="CENTER_LEFT" spacing="11" styleClass="brand-lockup">
                 <StackPane styleClass="brand-mark">
                     <ImageView fitWidth="30" fitHeight="30" preserveRatio="true" smooth="true">
@@ -56,11 +57,18 @@
                 </Button>
             </VBox>
         </VBox>
+        <Region fx:id="leftResizeHandle" minWidth="6" prefWidth="6" maxWidth="6"
+                styleClass="sidebar-resize-handle, left-resize-handle"/>
+        </HBox>
     </left>
 
     <center>
-        <VBox styleClass="main-surface">
+        <VBox fx:id="mainSurface" styleClass="main-surface">
             <HBox minHeight="72" prefHeight="72" alignment="CENTER_LEFT" spacing="16" styleClass="navbar">
+                <Button fx:id="leftSidebarToggleButton" onAction="#handleToggleNavigation" styleClass="icon-button" focusTraversable="false">
+                    <graphic><FontIcon iconLiteral="fas-bars" iconSize="16" styleClass="toolbar-icon"/></graphic>
+                    <tooltip><Tooltip text="Show or hide navigation"/></tooltip>
+                </Button>
                 <VBox spacing="2" alignment="CENTER_LEFT" styleClass="navbar-status-group">
                     <Label text="Your workspace" styleClass="topbar-title"/>
                     <Label fx:id="saveStatusLabel" text="" styleClass="save-status"/>
@@ -74,7 +82,7 @@
                     <graphic><FontIcon iconLiteral="fas-bell" iconSize="16" styleClass="toolbar-icon"/></graphic>
                     <tooltip><Tooltip text="Notifications"/></tooltip>
                 </Button>
-                <Button onAction="#handleToggleAgenda" styleClass="icon-button" focusTraversable="false">
+                <Button fx:id="agendaToggleButton" onAction="#handleToggleAgenda" styleClass="icon-button" focusTraversable="false">
                     <graphic><FontIcon iconLiteral="fas-calendar-alt" iconSize="16" styleClass="toolbar-icon"/></graphic>
                     <tooltip><Tooltip text="Show or hide agenda"/></tooltip>
                 </Button>
@@ -303,11 +311,26 @@
                             </Button>
                         </HBox>
                         <Region HBox.hgrow="ALWAYS"/>
-                        <Label text="Ctrl/⌘ + mouse wheel to zoom" styleClass="calendar-hint"/>
+                        <HBox alignment="CENTER" spacing="2" styleClass="segmented-navigation, calendar-zoom-controls">
+                            <Button text="−" onAction="#handleCalendarZoomOut" accessibleText="Zoom calendar out"
+                                    styleClass="icon-button, segment-button, calendar-zoom-button">
+                                <tooltip><Tooltip text="Zoom out (Ctrl/⌘ −)"/></tooltip>
+                            </Button>
+                            <Label fx:id="calendarZoomLabel" text="100%" alignment="CENTER" styleClass="calendar-zoom-value"/>
+                            <Button text="+" onAction="#handleCalendarZoomIn" accessibleText="Zoom calendar in"
+                                    styleClass="icon-button, segment-button, calendar-zoom-button">
+                                <tooltip><Tooltip text="Zoom in (Ctrl/⌘ + or mouse wheel)"/></tooltip>
+                            </Button>
+                            <Button onAction="#handleCalendarZoomReset" accessibleText="Reset calendar zoom"
+                                    styleClass="icon-button, segment-button, calendar-zoom-reset">
+                                <graphic><FontIcon iconLiteral="fas-undo-alt" iconSize="10" styleClass="toolbar-icon"/></graphic>
+                                <tooltip><Tooltip text="Reset zoom (Ctrl/⌘ 0)"/></tooltip>
+                            </Button>
+                        </HBox>
                     </HBox>
                     <StackPane styleClass="calendar-surface" VBox.vgrow="ALWAYS">
                         <ScrollPane fx:id="calendarScrollPane" fitToWidth="true" hbarPolicy="NEVER" styleClass="calendar-scroll">
-                            <HBox spacing="0">
+                            <HBox fx:id="calendarContentRow" spacing="0">
                                 <AnchorPane fx:id="timeLabelsContainer" prefWidth="72" minWidth="72" maxWidth="72" styleClass="time-column"/>
                                 <AnchorPane fx:id="calendarTimelineArea" prefWidth="1000" prefHeight="1440" HBox.hgrow="ALWAYS" styleClass="timeline-area"/>
                             </HBox>
@@ -503,7 +526,10 @@
     </center>
 
     <right>
-        <VBox fx:id="rightPanel" prefWidth="296" minWidth="276" maxWidth="316" spacing="20" styleClass="right-panel">
+        <HBox fx:id="rightSidebarWrapper">
+        <Region fx:id="rightResizeHandle" minWidth="6" prefWidth="6" maxWidth="6"
+                styleClass="sidebar-resize-handle, right-resize-handle"/>
+        <VBox fx:id="rightPanel" prefWidth="296" minWidth="296" maxWidth="296" spacing="20" styleClass="right-panel">
             <HBox alignment="CENTER_LEFT" spacing="10">
                 <StackPane styleClass="panel-icon-wrap">
                     <FontIcon iconLiteral="fas-calendar-check" iconSize="14" styleClass="accent-icon"/>
@@ -526,7 +552,7 @@
                         <graphic><FontIcon iconLiteral="fas-chevron-right" iconSize="10" styleClass="toolbar-icon"/></graphic>
                     </Button>
                 </HBox>
-                <GridPane fx:id="miniCalendarGrid" hgap="3" vgap="3" alignment="CENTER"/>
+                <GridPane fx:id="miniCalendarGrid" hgap="3" vgap="3" alignment="CENTER" maxWidth="221"/>
             </VBox>
 
             <Separator styleClass="panel-separator"/>
@@ -541,5 +567,6 @@
                 </ScrollPane>
             </VBox>
         </VBox>
+        </HBox>
     </right>
 </BorderPane>
